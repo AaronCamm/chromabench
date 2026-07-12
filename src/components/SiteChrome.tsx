@@ -37,16 +37,14 @@ export function SiteHeader({ active }: { active?: "home" | "bench" }) {
             </Link>
           )}
           <AuthHeaderControls />
-          <Link
-            to="/bench"
-            className={`mono text-[11px] uppercase tracking-widest ml-1 px-3 py-2 hidden sm:inline ${
-              active === "bench"
-                ? "bg-accent text-background"
-                : "bg-foreground text-background hover:bg-accent"
-            }`}
-          >
-            {active === "bench" ? "Bench" : "Open bench →"}
-          </Link>
+          {active !== "bench" && (
+            <Link
+              to="/bench"
+              className="mono text-[11px] uppercase tracking-widest ml-1 px-3 py-2 hidden sm:inline bg-foreground text-background hover:bg-accent"
+            >
+              Open bench →
+            </Link>
+          )}
         </nav>
       </div>
     </header>
