@@ -11,6 +11,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider } from "@/contexts/auth-context";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -92,9 +94,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Chromabench — Hobby paint converter & mixer" },
-      { name: "twitter:description", content: "Match Citadel, Vallejo, Tamiya, Mr. Color, SMS, Army Painter, AK Interactive and more. Find cross-brand equivalents and build multi-brand mix recipes." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ef86e612-cee6-4c9b-83d2-9f4b4cff7762/id-preview-875e2643--74de1408-2c4a-4eec-9911-bf466e844507.lovable.app-1783758247917.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ef86e612-cee6-4c9b-83d2-9f4b4cff7762/id-preview-875e2643--74de1408-2c4a-4eec-9911-bf466e844507.lovable.app-1783758247917.png" },
+      {
+        name: "twitter:description",
+        content:
+          "Match Citadel, Vallejo, Tamiya, Mr. Color, SMS, Army Painter, AK Interactive and more. Find cross-brand equivalents and build multi-brand mix recipes.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ef86e612-cee6-4c9b-83d2-9f4b4cff7762/id-preview-875e2643--74de1408-2c4a-4eec-9911-bf466e844507.lovable.app-1783758247917.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ef86e612-cee6-4c9b-83d2-9f4b4cff7762/id-preview-875e2643--74de1408-2c4a-4eec-9911-bf466e844507.lovable.app-1783758247917.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -132,8 +146,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

@@ -1,45 +1,108 @@
 import { useMemo, useState } from "react";
 import { PAINTS, BRANDS, type Paint } from "@/data/paints";
 import { contrastText, deltaE, hexToLab, mixHex } from "@/lib/color";
-import { Search, Plus, X, ArrowRight, Beaker, Target, Shuffle } from "lucide-react";
+import { Search, Plus, X, ArrowRight, Beaker, Target, Shuffle, Heart } from "lucide-react";
+import { AccessGate } from "@/components/AccessGate";
+import { FavouriteButton, FavouritesPanel } from "@/components/FavouritesPanel";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
 
-type Tab = "equivalents" | "mixer" | "recipe";
+type Tab = "equivalents" | "mixer" | "recipe" | "favourites";
+type MixEntry = { paint: Paint; parts: number };
 
 export function PaintConverter() {
   const [tab, setTab] = useState<Tab>("equivalents");
+  const [mixerSeed, setMixerSeed] = useState<MixEntry[] | null>(null);
+  const [mixerKey, setMixerKey] = useState(0);
+
+  const loadMixer = (entries: MixEntry[]) => {
+    setMixerSeed(entries);
+    setMixerKey((k) => k + 1);
+    setTab("mixer");
+  };
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-0 border border-border bg-card">
-        <TabBtn active={tab === "equivalents"} onClick={() => setTab("equivalents")} icon={<Shuffle className="h-3.5 w-3.5" />} label="Equivalents" hint="01" />
-        <TabBtn active={tab === "mixer"} onClick={() => setTab("mixer")} icon={<Beaker className="h-3.5 w-3.5" />} label="Mixer" hint="02" />
-        <TabBtn active={tab === "recipe"} onClick={() => setTab("recipe")} icon={<Target className="h-3.5 w-3.5" />} label="Recipe finder" hint="03" />
+      <div className="flex items-center gap-0 border border-border bg-card overflow-x-auto">
+        <TabBtn
+          active={tab === "equivalents"}
+          onClick={() => setTab("equivalents")}
+          icon={<Shuffle className="h-3.5 w-3.5" />}
+          label="Equivalents"
+          hint="01"
+        />
+        <TabBtn
+          active={tab === "mixer"}
+          onClick={() => setTab("mixer")}
+          icon={<Beaker className="h-3.5 w-3.5" />}
+          label="Mixer"
+          hint="02"
+        />
+        <TabBtn
+          active={tab === "recipe"}
+          onClick={() => setTab("recipe")}
+          icon={<Target className="h-3.5 w-3.5" />}
+          label="Recipe finder"
+          hint="03"
+        />
+        <TabBtn
+          active={tab === "favourites"}
+          onClick={() => setTab("favourites")}
+          icon={<Heart className="h-3.5 w-3.5" />}
+          label="Favourites"
+          hint="04"
+        />
       </div>
       <div className="border border-t-0 border-border bg-card">
         {tab === "equivalents" && <EquivalentsPanel />}
-        {tab === "mixer" && <MixerPanel />}
-        {tab === "recipe" && <RecipePanel />}
+        {tab === "mixer" && (
+          <AccessGate feature="Mixer">
+            <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />
+          </AccessGate>
+        )}
+        {tab === "recipe" && (
+          <AccessGate feature="Recipe finder">
+            <RecipePanel onLoadMixer={loadMixer} />
+          </AccessGate>
+        )}
+        {tab === "favourites" && (
+          <AccessGate feature="Favourites">
+            <FavouritesPanel onLoadMixer={loadMixer} />
+          </AccessGate>
+        )}
       </div>
     </div>
   );
 }
 
 function TabBtn({
-  active, onClick, icon, label, hint,
-}: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; hint: string }) {
+  active,
+  onClick,
+  icon,
+  label,
+  hint,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group flex-1 flex items-center justify-between gap-3 px-5 py-4 text-left border-r border-border last:border-r-0 transition-colors ${
+      className={`group flex-1 min-w-[7.5rem] flex items-center justify-between gap-3 px-5 py-4 text-left border-r border-border last:border-r-0 transition-colors ${
         active ? "bg-foreground text-background" : "hover:bg-surface"
       }`}
     >
       <span className="flex items-center gap-2">
         {icon}
-        <span className="text-sm font-semibold tracking-tight">{label}</span>
+        <span className="text-sm font-semibold tracking-tight whitespace-nowrap">{label}</span>
       </span>
-      <span className={`mono text-[10px] ${active ? "opacity-60" : "text-muted-foreground"}`}>{hint}</span>
+      <span className={`mono text-[10px] ${active ? "opacity-60" : "text-muted-foreground"}`}>
+        {hint}
+      </span>
     </button>
   );
 }
@@ -47,8 +110,14 @@ function TabBtn({
 /* ─────────── Paint picker ─────────── */
 
 function PaintPicker({
-  value, onChange, placeholder = "Search paint by name, code, or brand…",
-}: { value: Paint | null; onChange: (p: Paint | null) => void; placeholder?: string }) {
+  value,
+  onChange,
+  placeholder = "Search paint by name, code, or brand…",
+}: {
+  value: Paint | null;
+  onChange: (p: Paint | null) => void;
+  placeholder?: string;
+}) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -88,7 +157,10 @@ function PaintPicker({
         <Search className="h-4 w-4 ml-3 text-muted-foreground" />
         <input
           value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
@@ -102,10 +174,17 @@ function PaintPicker({
               key={p.id}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onChange(p); setQ(""); setOpen(false); }}
+              onClick={() => {
+                onChange(p);
+                setQ("");
+                setOpen(false);
+              }}
               className="flex w-full items-center gap-3 border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-surface"
             >
-              <span className="h-6 w-6 shrink-0 border border-border" style={{ backgroundColor: p.hex }} />
+              <span
+                className="h-6 w-6 shrink-0 border border-border"
+                style={{ backgroundColor: p.hex }}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium truncate">{p.name}</span>
                 <span className="mono block text-[10px] text-muted-foreground uppercase tracking-widest truncate">
@@ -123,7 +202,9 @@ function PaintPicker({
 /* ─────────── Equivalents ─────────── */
 
 function EquivalentsPanel() {
-  const [source, setSource] = useState<Paint | null>(PAINTS.find(p => p.name === "Mephiston Red") ?? null);
+  const [source, setSource] = useState<Paint | null>(
+    PAINTS.find((p) => p.name === "Mephiston Red") ?? null,
+  );
 
   const grouped = useMemo(() => {
     if (!source) return [];
@@ -138,7 +219,10 @@ function EquivalentsPanel() {
     }
     return BRANDS.filter((b) => byBrand.has(b)).map((brand) => ({
       brand,
-      matches: byBrand.get(brand)!.sort((a, b) => a.dE - b.dE).slice(0, 10),
+      matches: byBrand
+        .get(brand)!
+        .sort((a, b) => a.dE - b.dE)
+        .slice(0, 10),
     }));
   }, [source]);
 
@@ -155,7 +239,7 @@ function EquivalentsPanel() {
         <div className="space-y-2">
           <Label num="B" text="Closest cross-brand matches" />
           <div className="border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-            Top 10 per brand, ranked by ΔE (CIE76). Lower is closer.
+            Top 10 per brand, ranked by ΔE (CIE76). Lower is closer. Free to use.
           </div>
         </div>
       </div>
@@ -166,19 +250,28 @@ function EquivalentsPanel() {
             <div key={brand} className="border border-border">
               <div className="flex items-center justify-between border-b border-border bg-surface px-3 py-2">
                 <span className="mono text-[10px] uppercase tracking-widest">{brand}</span>
-                <span className="mono text-[10px] text-muted-foreground">{matches.length} match{matches.length === 1 ? "" : "es"}</span>
+                <span className="mono text-[10px] text-muted-foreground">
+                  {matches.length} match{matches.length === 1 ? "" : "es"}
+                </span>
               </div>
               <ul>
                 {matches.map(({ paint, dE }) => (
-                  <li key={paint.id} className="flex items-stretch border-b border-border last:border-b-0">
+                  <li
+                    key={paint.id}
+                    className="flex items-stretch border-b border-border last:border-b-0"
+                  >
                     <div className="w-10 shrink-0" style={{ backgroundColor: paint.hex }} />
                     <div className="flex-1 min-w-0 px-3 py-2">
                       <div className="text-sm font-medium truncate">{paint.name}</div>
-                      <div className="mono text-[10px] text-muted-foreground truncate">{paint.line} · {paint.code}</div>
+                      <div className="mono text-[10px] text-muted-foreground truncate">
+                        {paint.line} · {paint.code}
+                      </div>
                     </div>
                     <div className="flex flex-col items-end justify-center pr-3 pl-2">
                       <span className="mono text-[10px] text-muted-foreground">ΔE</span>
-                      <span className={`mono text-sm font-semibold ${dE < 3 ? "text-foreground" : dE < 7 ? "text-foreground/80" : "text-muted-foreground"}`}>
+                      <span
+                        className={`mono text-sm font-semibold ${dE < 3 ? "text-foreground" : dE < 7 ? "text-foreground/80" : "text-muted-foreground"}`}
+                      >
                         {dE.toFixed(1)}
                       </span>
                     </div>
@@ -195,13 +288,15 @@ function EquivalentsPanel() {
 
 /* ─────────── Mixer ─────────── */
 
-type MixEntry = { paint: Paint; parts: number };
-
-function MixerPanel() {
-  const [entries, setEntries] = useState<MixEntry[]>([
-    { paint: PAINTS.find((p) => p.brand === "Tamiya" && p.code === "X-7")!, parts: 2 },
-    { paint: PAINTS.find((p) => p.brand === "Tamiya" && p.code === "X-2")!, parts: 1 },
-  ]);
+function MixerPanel({ initialEntries }: { initialEntries?: MixEntry[] }) {
+  const { saveFavourite, hasAccess, configured } = useAuth();
+  const [entries, setEntries] = useState<MixEntry[]>(
+    initialEntries ??
+      [
+        { paint: PAINTS.find((p) => p.brand === "Tamiya" && p.code === "X-7")!, parts: 2 },
+        { paint: PAINTS.find((p) => p.brand === "Tamiya" && p.code === "X-2")!, parts: 1 },
+      ].filter((e) => e.paint),
+  );
 
   const mixed = useMemo(() => {
     if (entries.length === 0) return null;
@@ -219,7 +314,24 @@ function MixerPanel() {
   return (
     <div className="p-5 md:p-8 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
       <div className="space-y-4">
-        <Label num="A" text="Recipe" />
+        <div className="flex items-center justify-between gap-3">
+          <Label num="A" text="Recipe" />
+          <FavouriteButton
+            disabled={!configured || !hasAccess || entries.length === 0 || !mixed}
+            onSave={async () => {
+              const res = await saveFavourite({
+                kind: "mixer",
+                title: entries.map((e) => `${e.parts}× ${e.paint.code}`).join(" + "),
+                payload: {
+                  paints: entries.map((e) => ({ id: e.paint.id, parts: e.parts })),
+                  hex: mixed ?? undefined,
+                },
+              });
+              if (res.error) toast.error(res.error);
+              else toast.success("Recipe saved to favourites");
+            }}
+          />
+        </div>
         <div className="space-y-2">
           {entries.map((e, i) => (
             <div key={i} className="flex items-stretch gap-2">
@@ -236,14 +348,28 @@ function MixerPanel() {
                 <button
                   type="button"
                   className="px-2 hover:bg-surface"
-                  onClick={() => setEntries(entries.map((x, j) => (j === i ? { ...x, parts: Math.max(1, x.parts - 1) } : x)))}
-                >−</button>
-                <div className="w-10 flex items-center justify-center mono text-sm font-semibold border-x border-border">{e.parts}</div>
+                  onClick={() =>
+                    setEntries(
+                      entries.map((x, j) =>
+                        j === i ? { ...x, parts: Math.max(1, x.parts - 1) } : x,
+                      ),
+                    )
+                  }
+                >
+                  −
+                </button>
+                <div className="w-10 flex items-center justify-center mono text-sm font-semibold border-x border-border">
+                  {e.parts}
+                </div>
                 <button
                   type="button"
                   className="px-2 hover:bg-surface"
-                  onClick={() => setEntries(entries.map((x, j) => (j === i ? { ...x, parts: x.parts + 1 } : x)))}
-                >+</button>
+                  onClick={() =>
+                    setEntries(entries.map((x, j) => (j === i ? { ...x, parts: x.parts + 1 } : x)))
+                  }
+                >
+                  +
+                </button>
               </div>
               <button
                 type="button"
@@ -258,7 +384,8 @@ function MixerPanel() {
           <AddPaintRow onAdd={(p) => setEntries([...entries, { paint: p, parts: 1 }])} />
         </div>
         <p className="mono text-[10px] text-muted-foreground">
-          Parts are volumetric. Colors blend in linear sRGB — a physical approximation, not perfect pigment chemistry.
+          Parts are volumetric. Colors blend in linear sRGB — a physical approximation, not perfect
+          pigment chemistry.
         </p>
       </div>
 
@@ -278,16 +405,25 @@ function MixerPanel() {
             </div>
 
             <div className="space-y-2">
-              <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">Closest single-paint equivalents</div>
+              <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Closest single-paint equivalents
+              </div>
               <ul className="border border-border">
                 {closest.map(({ p, dE }) => (
-                  <li key={p.id} className="flex items-stretch border-b border-border last:border-b-0">
+                  <li
+                    key={p.id}
+                    className="flex items-stretch border-b border-border last:border-b-0"
+                  >
                     <div className="w-8 shrink-0" style={{ backgroundColor: p.hex }} />
                     <div className="flex-1 min-w-0 px-3 py-1.5">
                       <div className="text-xs font-medium truncate">{p.name}</div>
-                      <div className="mono text-[10px] text-muted-foreground truncate">{p.brand} · {p.code}</div>
+                      <div className="mono text-[10px] text-muted-foreground truncate">
+                        {p.brand} · {p.code}
+                      </div>
                     </div>
-                    <div className="flex items-center pr-3 mono text-xs font-semibold">{dE.toFixed(1)}</div>
+                    <div className="flex items-center pr-3 mono text-xs font-semibold">
+                      {dE.toFixed(1)}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -309,10 +445,17 @@ function RecipeSummary({ entries }: { entries: MixEntry[] }) {
     <ul className="divide-y divide-border">
       {entries.map((e, i) => (
         <li key={i} className="flex items-center gap-3 px-3 py-2">
-          <span className="h-4 w-4 shrink-0 border border-border" style={{ backgroundColor: e.paint.hex }} />
-          <span className="mono text-[10px] text-muted-foreground w-10">{Math.round((e.parts / total) * 100)}%</span>
+          <span
+            className="h-4 w-4 shrink-0 border border-border"
+            style={{ backgroundColor: e.paint.hex }}
+          />
+          <span className="mono text-[10px] text-muted-foreground w-10">
+            {Math.round((e.parts / total) * 100)}%
+          </span>
           <span className="mono text-xs font-semibold w-6">{e.parts}×</span>
-          <span className="text-xs truncate flex-1">{e.paint.brand} {e.paint.code} · {e.paint.name}</span>
+          <span className="text-xs truncate flex-1">
+            {e.paint.brand} {e.paint.code} · {e.paint.name}
+          </span>
         </li>
       ))}
     </ul>
@@ -345,8 +488,11 @@ function AddPaintRow({ onAdd }: { onAdd: (p: Paint) => void }) {
 
 /* ─────────── Recipe finder ─────────── */
 
-function RecipePanel() {
-  const [target, setTarget] = useState<Paint | null>(PAINTS.find(p => p.name === "Mephiston Red") ?? null);
+function RecipePanel({ onLoadMixer }: { onLoadMixer: (entries: MixEntry[]) => void }) {
+  const { saveFavourite, hasAccess, configured } = useAuth();
+  const [target, setTarget] = useState<Paint | null>(
+    PAINTS.find((p) => p.name === "Mephiston Red") ?? null,
+  );
   const [brand, setBrand] = useState<string>("Tamiya");
 
   const results = useMemo(() => {
@@ -354,7 +500,15 @@ function RecipePanel() {
     const targetLab = hexToLab(target.hex);
     const pool = PAINTS.filter((p) => p.brand === brand);
     const labs = pool.map((p) => hexToLab(p.hex));
-    const ratios: [number, number][] = [[1, 1], [2, 1], [1, 2], [3, 1], [1, 3], [3, 2], [2, 3]];
+    const ratios: [number, number][] = [
+      [1, 1],
+      [2, 1],
+      [1, 2],
+      [3, 1],
+      [1, 3],
+      [3, 2],
+      [2, 3],
+    ];
     type Row = { a: Paint; b: Paint; ra: number; rb: number; hex: string; dE: number };
     const TOP = 10;
     const best: Row[] = [];
@@ -374,7 +528,10 @@ function RecipePanel() {
       for (let j = i + 1; j < pool.length; j++) {
         const b = pool[j];
         for (const [ra, rb] of ratios) {
-          const hex = mixHex([{ hex: a.hex, parts: ra }, { hex: b.hex, parts: rb }]);
+          const hex = mixHex([
+            { hex: a.hex, parts: ra },
+            { hex: b.hex, parts: rb },
+          ]);
           consider({ a, b, ra, rb, hex, dE: deltaE(targetLab, hexToLab(hex)) });
         }
       }
@@ -416,7 +573,9 @@ function RecipePanel() {
                 <div
                   className="w-20 flex items-center justify-center mono text-[10px]"
                   style={{ backgroundColor: target.hex, color: contrastText(target.hex) }}
-                >target</div>
+                >
+                  target
+                </div>
                 <div
                   className="flex-1 flex items-end justify-between p-3"
                   style={{ backgroundColor: r.hex, color: contrastText(r.hex) }}
@@ -427,17 +586,60 @@ function RecipePanel() {
               </div>
               <div className="divide-y divide-border">
                 <div className="flex items-center gap-3 px-3 py-2">
-                  <span className="h-4 w-4 shrink-0 border border-border" style={{ backgroundColor: r.a.hex }} />
+                  <span
+                    className="h-4 w-4 shrink-0 border border-border"
+                    style={{ backgroundColor: r.a.hex }}
+                  />
                   <span className="mono text-xs font-semibold w-8">{r.ra}×</span>
-                  <span className="text-xs truncate">{r.a.code} · {r.a.name}</span>
+                  <span className="text-xs truncate">
+                    {r.a.code} · {r.a.name}
+                  </span>
                 </div>
                 {r.rb > 0 && (
                   <div className="flex items-center gap-3 px-3 py-2">
-                    <span className="h-4 w-4 shrink-0 border border-border" style={{ backgroundColor: r.b.hex }} />
+                    <span
+                      className="h-4 w-4 shrink-0 border border-border"
+                      style={{ backgroundColor: r.b.hex }}
+                    />
                     <span className="mono text-xs font-semibold w-8">{r.rb}×</span>
-                    <span className="text-xs truncate">{r.b.code} · {r.b.name}</span>
+                    <span className="text-xs truncate">
+                      {r.b.code} · {r.b.name}
+                    </span>
                   </div>
                 )}
+              </div>
+              <div className="flex border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const entries: MixEntry[] = [{ paint: r.a, parts: r.ra }];
+                    if (r.rb > 0) entries.push({ paint: r.b, parts: r.rb });
+                    onLoadMixer(entries);
+                  }}
+                  className="flex-1 mono text-[10px] uppercase tracking-widest px-3 py-2 hover:bg-surface"
+                >
+                  Open in mixer
+                </button>
+                <FavouriteButton
+                  disabled={!configured || !hasAccess}
+                  onSave={async () => {
+                    const paints = [{ id: r.a.id, parts: r.ra }];
+                    if (r.rb > 0) paints.push({ id: r.b.id, parts: r.rb });
+                    const res = await saveFavourite({
+                      kind: "finder",
+                      title: `${r.ra}× ${r.a.code}${r.rb > 0 ? ` + ${r.rb}× ${r.b.code}` : ""}`,
+                      payload: {
+                        paints,
+                        hex: r.hex,
+                        dE: r.dE,
+                        brand,
+                        targetPaintId: target.id,
+                      },
+                    });
+                    if (res.error) toast.error(res.error);
+                    else toast.success("Recipe saved to favourites");
+                  }}
+                />
               </div>
             </div>
           ))}
@@ -452,8 +654,12 @@ function RecipePanel() {
 function Label({ num, text }: { num: string; text: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground border border-border px-1.5 py-0.5">{num}</span>
-      <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">{text}</span>
+      <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground border border-border px-1.5 py-0.5">
+        {num}
+      </span>
+      <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        {text}
+      </span>
     </div>
   );
 }
