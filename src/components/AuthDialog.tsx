@@ -23,6 +23,7 @@ export function AuthDialog({
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -31,6 +32,12 @@ export function AuthDialog({
     e.preventDefault();
     setError(null);
     setMessage(null);
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     setBusy(true);
     try {
       if (mode === "signin") {
@@ -42,6 +49,8 @@ export function AuthDialog({
         if (res.error) setError(res.error);
         else {
           setMessage("Check your email to confirm, or sign in if confirmations are disabled.");
+          setPassword("");
+          setConfirmPassword("");
           setMode("signin");
         }
       }
@@ -102,6 +111,27 @@ export function AuthDialog({
               className="w-full border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
             />
           </div>
+          {mode === "signup" && (
+            <div className="space-y-1.5">
+              <label
+                className="mono text-[10px] uppercase tracking-widest text-muted-foreground"
+                htmlFor="auth-confirm-password"
+              >
+                Confirm password
+              </label>
+              <input
+                id="auth-confirm-password"
+                type="password"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={!configured || busy}
+                className="w-full border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
+              />
+            </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           {message && <p className="text-sm text-muted-foreground">{message}</p>}
@@ -119,6 +149,7 @@ export function AuthDialog({
             className="w-full mono text-[11px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
             onClick={() => {
               setMode(mode === "signin" ? "signup" : "signin");
+              setConfirmPassword("");
               setError(null);
               setMessage(null);
             }}
