@@ -17,13 +17,14 @@ Chromabench uses **Supabase** (auth + Postgres) and **Stripe** ($5/month with a 
 1. Create a Product **Chromabench** with a recurring Price of **$5 USD / month**.
 2. Copy the Price ID into `STRIPE_PRICE_ID_MONTHLY`.
 3. Enable the **Customer Portal** (Settings → Billing → Customer portal): allow cancel and payment method update.
-4. Webhook endpoint: `https://YOUR_DOMAIN/api/stripe/webhook`  
+4. Webhook endpoint: `https://chromabench.com/api/stripe/webhook`  
    Events:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-5. Local testing: `stripe listen --forward-to localhost:5173/api/stripe/webhook` and set `STRIPE_WEBHOOK_SECRET` to the CLI secret.
+   - `customer.subscription.deleted`  
+   Use the **Dashboard** signing secret (not only the Stripe CLI secret) in Vercel as `STRIPE_WEBHOOK_SECRET`.  
+   The app also syncs from Stripe when you return from Checkout or open the bench while signed in.
 
 Checkout is created with `trial_period_days: 7` and collects a payment method up front.
 

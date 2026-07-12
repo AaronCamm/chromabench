@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAccess } from "@/hooks/use-access";
 import { AuthDialog } from "@/components/AuthDialog";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 export function AccessGate({
   children,
@@ -12,15 +13,48 @@ export function AccessGate({
   feature?: string;
 }) {
   const { loading, signedIn, hasAccess, configured } = useAccess();
-  const { startCheckout, openBillingPortal, subscription } = useAuth();
+  const { startCheckout, openBillingPortal, subscription, refreshAccess, session } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (loading) {
+  useEffect(() => {
+    if (!configured || !signedIn || hasAccess || loading) return;
+    let cancelled = false;
+    (async () => {
+      setSyncing(true);
+      try {
+        const token =
+          session?.access_token ??
+          (await getSupabaseBrowserClient().auth.getSession()).data.session?.access_token;
+        if (!token) return;
+        await fetch("/api/stripe/sync", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        });
+        if (!cancelled) await refreshAccess();
+      } catch {
+        /* ignore — user can retry */
+      } finally {
+        if (!cancelled) setSyncing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, signedIn, hasAccess, loading, session?.access_token, refreshAccess]);
+
+  if (loading || syncing) {
     return (
       <div className="min-h-[28rem] flex items-center justify-center border border-border bg-card p-6">
-        <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground">Loading…</p>
+        <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          {syncing ? "Checking subscription…" : "Loading…"}
+        </p>
       </div>
     );
   }
@@ -48,6 +82,32 @@ export function AccessGate({
       await openBillingPortal();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Portal failed");
+      setBusy(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const token =
+        session?.access_token ??
+        (await getSupabaseBrowserClient().auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error("Sign in required");
+      const res = await fetch("/api/stripe/sync", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; status?: string };
+      if (!res.ok) throw new Error(body.error ?? "Could not find a subscription");
+      await refreshAccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Refresh failed");
+    } finally {
       setBusy(false);
     }
   };
@@ -89,7 +149,15 @@ export function AccessGate({
                 onClick={onCheckout}
                 className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent disabled:opacity-50"
               >
-                {busy ? "Redirecting…" : "Start 7-day trial"}
+                {busy ? "Working…" : "Start 7-day trial"}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onRefresh}
+                className="mono text-[11px] uppercase tracking-widest border border-border px-4 py-2.5 hover:bg-surface disabled:opacity-50"
+              >
+                Already subscribed? Refresh
               </button>
               <button
                 type="button"

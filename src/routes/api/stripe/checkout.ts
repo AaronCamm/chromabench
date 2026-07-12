@@ -69,7 +69,7 @@ export const Route = createFileRoute("/api/stripe/checkout")({
               metadata: { supabase_user_id: user.id },
             },
             metadata: { supabase_user_id: user.id },
-            success_url: `${appUrl}/bench?checkout=success`,
+            success_url: `${appUrl}/bench?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${appUrl}/bench?checkout=cancel`,
             allow_promotion_codes: true,
           });

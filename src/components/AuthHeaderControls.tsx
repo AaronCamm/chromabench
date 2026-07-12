@@ -14,6 +14,7 @@ export function AuthHeaderControls() {
     signOut,
     startCheckout,
     openBillingPortal,
+    refreshAccess,
   } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,9 +23,32 @@ export function AuthHeaderControls() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get("checkout");
+    const sessionId = params.get("session_id");
+
     if (checkout === "success") {
       toast.success("Trial started — welcome to Chromabench");
+      (async () => {
+        try {
+          const {
+            data: { session },
+          } = await (await import("@/lib/supabase")).getSupabaseBrowserClient().auth.getSession();
+          if (session?.access_token) {
+            await fetch("/api/stripe/sync", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ sessionId: sessionId ?? undefined }),
+            });
+            await refreshAccess();
+          }
+        } catch {
+          /* refresh on next load */
+        }
+      })();
       params.delete("checkout");
+      params.delete("session_id");
       const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     } else if (checkout === "cancel") {
@@ -33,7 +57,7 @@ export function AuthHeaderControls() {
       const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     }
-  }, []);
+  }, [refreshAccess]);
 
   if (!configured) {
     return (
