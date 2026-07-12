@@ -10,7 +10,6 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
 import { hasPaidAccess, type FavouriteRecipe, type Profile, type Subscription } from "@/lib/types";
-import { createCheckoutSession, createPortalSession } from "@/lib/billing.functions";
 
 /* Context modules export hooks alongside the provider. */
 /* eslint-disable react-refresh/only-export-components */
@@ -137,18 +136,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const startCheckout = useCallback(async () => {
     if (!session?.access_token) throw new Error("Sign in required");
-    const { url } = await createCheckoutSession({
-      data: { accessToken: session.access_token },
+    const res = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
     });
-    window.location.href = url;
+    const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+    if (!res.ok || !body.url) {
+      throw new Error(body.error ?? "Checkout failed");
+    }
+    window.location.href = body.url;
   }, [session]);
 
   const openBillingPortal = useCallback(async () => {
     if (!session?.access_token) throw new Error("Sign in required");
-    const { url } = await createPortalSession({
-      data: { accessToken: session.access_token },
+    const res = await fetch("/api/stripe/portal", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
     });
-    window.location.href = url;
+    const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+    if (!res.ok || !body.url) {
+      throw new Error(body.error ?? "Portal failed");
+    }
+    window.location.href = body.url;
   }, [session]);
 
   const saveFavourite = useCallback(
