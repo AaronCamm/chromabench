@@ -59,7 +59,7 @@ export function AuthDialog({
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             {configured
-              ? "7-day free trial, then $5/month. Mixer, recipe finder, and favourites need an account."
+              ? "7-day free trial, then $5/month. Sign in to use the full bench."
               : "Auth is not configured yet. Add Supabase env vars to enable sign-in."}
           </DialogDescription>
         </DialogHeader>

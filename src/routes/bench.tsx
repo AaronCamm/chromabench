@@ -30,7 +30,7 @@ function BenchPage() {
               <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">The bench</h1>
             </div>
             <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground max-w-sm text-right">
-              Equivalents free · Mixer, recipes &amp; favourites with a trial
+              Sign in required · 7-day trial, then $5/month
             </p>
           </div>
           <div className="mt-8">

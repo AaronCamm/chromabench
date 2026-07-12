@@ -54,22 +54,12 @@ export function PaintConverter() {
         />
       </div>
       <div className="border border-t-0 border-border bg-card">
-        {tab === "equivalents" && <EquivalentsPanel />}
-        {tab === "mixer" && (
-          <AccessGate feature="Mixer">
-            <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />
-          </AccessGate>
-        )}
-        {tab === "recipe" && (
-          <AccessGate feature="Recipe finder">
-            <RecipePanel onLoadMixer={loadMixer} />
-          </AccessGate>
-        )}
-        {tab === "favourites" && (
-          <AccessGate feature="Favourites">
-            <FavouritesPanel onLoadMixer={loadMixer} />
-          </AccessGate>
-        )}
+        <AccessGate feature="The bench">
+          {tab === "equivalents" && <EquivalentsPanel />}
+          {tab === "mixer" && <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />}
+          {tab === "recipe" && <RecipePanel onLoadMixer={loadMixer} />}
+          {tab === "favourites" && <FavouritesPanel onLoadMixer={loadMixer} />}
+        </AccessGate>
       </div>
     </div>
   );
@@ -239,7 +229,7 @@ function EquivalentsPanel() {
         <div className="space-y-2">
           <Label num="B" text="Closest cross-brand matches" />
           <div className="border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-            Top 10 per brand, ranked by ΔE (CIE76). Lower is closer. Free to use.
+            Top 10 per brand, ranked by ΔE (CIE76). Lower is closer.
           </div>
         </div>
       </div>

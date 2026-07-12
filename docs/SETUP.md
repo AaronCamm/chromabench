@@ -59,6 +59,5 @@ where email = 'dad@example.com';
 
 ## 5. Product rules
 
-- **Equivalents** — free, no account required.
-- **Mixer / Recipe finder / Favourites** — require sign-in and access (`trialing`, `active`, or `complimentary`).
+- **Entire bench** (Equivalents, Mixer, Recipe finder, Favourites) — requires sign-in and access (`trialing`, `active`, or `complimentary`).
 - Favourites store mixer and finder recipes (paint IDs + parts + hex/ΔE metadata).

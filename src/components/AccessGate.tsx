@@ -69,7 +69,7 @@ export function AccessGate({
           <p className="text-sm text-muted-foreground leading-relaxed">
             {signedIn
               ? "Start a 7-day free trial, then $5/month. Cancel anytime from the billing portal."
-              : "Sign in to start a 7-day free trial ($5/month after). Equivalents stay free."}
+              : "Sign in or create an account to use the bench. Includes a 7-day free trial, then $5/month."}
           </p>
           {subscription?.status &&
             subscription.status !== "trialing" &&
