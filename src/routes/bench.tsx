@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AccessGate } from "@/components/AccessGate";
 import { PaintConverter } from "@/components/PaintConverter";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { useAccess } from "@/hooks/use-access";
 
 export const Route = createFileRoute("/bench")({
   component: BenchPage,
@@ -18,6 +19,9 @@ export const Route = createFileRoute("/bench")({
 });
 
 function BenchPage() {
+  const { hasAccess, signedIn } = useAccess();
+  const showPaywallHint = !(signedIn && hasAccess);
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <SiteHeader active="bench" />
@@ -30,9 +34,11 @@ function BenchPage() {
               </div>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">The bench</h1>
             </div>
-            <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground max-w-sm text-right">
-              Sign in required · 7-day trial, then $5/month
-            </p>
+            {showPaywallHint && (
+              <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground max-w-sm text-right">
+                Sign in required · 7-day trial, then $5/month
+              </p>
+            )}
           </div>
           <div className="mt-8">
             <AccessGate feature="The bench">
