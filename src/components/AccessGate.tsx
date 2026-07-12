@@ -1,9 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAccess } from "@/hooks/use-access";
 import { AuthDialog } from "@/components/AuthDialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+
+async function syncSubscription(accessToken: string, signal?: AbortSignal) {
+  const res = await fetch("/api/stripe/sync", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+    signal,
+  });
+  return res;
+}
 
 export function AccessGate({
   children,
@@ -13,41 +26,63 @@ export function AccessGate({
   feature?: string;
 }) {
   const { loading, signedIn, hasAccess, configured } = useAccess();
-  const { startCheckout, openBillingPortal, subscription, refreshAccess, session } = useAuth();
+  const { startCheckout, openBillingPortal, subscription, refreshAccess, session, user } =
+    useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const syncedUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!configured || !signedIn || hasAccess || loading) return;
-    let cancelled = false;
+    if (!user?.id) {
+      syncedUserId.current = null;
+      setSyncing(false);
+      return;
+    }
+    if (!configured || !signedIn || hasAccess || loading) {
+      if (hasAccess) setSyncing(false);
+      return;
+    }
+    // Only auto-sync once per signed-in user so effect churn can't leave us stuck.
+    if (syncedUserId.current === user.id) return;
+    syncedUserId.current = user.id;
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
+    setSyncing(true);
+    setError(null);
+
     (async () => {
-      setSyncing(true);
       try {
         const token =
           session?.access_token ??
           (await getSupabaseBrowserClient().auth.getSession()).data.session?.access_token;
-        if (!token) return;
-        await fetch("/api/stripe/sync", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: "{}",
-        });
-        if (!cancelled) await refreshAccess();
+        if (!token || controller.signal.aborted) return;
+        await syncSubscription(token, controller.signal);
+        if (!controller.signal.aborted) await refreshAccess();
       } catch {
-        /* ignore — user can retry */
+        /* aborted or network — fall through to paywall */
       } finally {
-        if (!cancelled) setSyncing(false);
+        window.clearTimeout(timeoutId);
+        setSyncing(false);
       }
     })();
+
     return () => {
-      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeoutId);
+      setSyncing(false);
     };
-  }, [configured, signedIn, hasAccess, loading, session?.access_token, refreshAccess]);
+  }, [
+    configured,
+    signedIn,
+    hasAccess,
+    loading,
+    user?.id,
+    session?.access_token,
+    refreshAccess,
+  ]);
 
   if (loading || syncing) {
     return (
@@ -94,15 +129,8 @@ export function AccessGate({
         session?.access_token ??
         (await getSupabaseBrowserClient().auth.getSession()).data.session?.access_token;
       if (!token) throw new Error("Sign in required");
-      const res = await fetch("/api/stripe/sync", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: "{}",
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string; status?: string };
+      const res = await syncSubscription(token);
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(body.error ?? "Could not find a subscription");
       await refreshAccess();
     } catch (err) {
