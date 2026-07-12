@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/stripe/portal")({
 
           const session = await stripe.billingPortal.sessions.create({
             customer: profile.stripe_customer_id,
-            return_url: `${appUrl}/#tool`,
+            return_url: `${appUrl}/bench`,
           });
 
           return Response.json({ url: session.url });

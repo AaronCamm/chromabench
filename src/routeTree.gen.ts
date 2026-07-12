@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BenchRouteImport } from './routes/bench'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 import { Route as ApiStripePortalRouteImport } from './routes/api/stripe/portal'
 import { Route as ApiStripeCheckoutRouteImport } from './routes/api/stripe/checkout'
@@ -17,6 +18,11 @@ import { Route as ApiStripeCheckoutRouteImport } from './routes/api/stripe/check
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BenchRoute = BenchRouteImport.update({
+  id: '/bench',
+  path: '/bench',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
@@ -37,12 +43,14 @@ const ApiStripeCheckoutRoute = ApiStripeCheckoutRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/bench': typeof BenchRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/portal': typeof ApiStripePortalRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bench': typeof BenchRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/portal': typeof ApiStripePortalRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
@@ -50,6 +58,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/bench': typeof BenchRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/portal': typeof ApiStripePortalRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
@@ -57,13 +66,22 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/api/stripe/checkout' | '/api/stripe/portal' | '/api/stripe/webhook'
+    | '/'
+    | '/bench'
+    | '/api/stripe/checkout'
+    | '/api/stripe/portal'
+    | '/api/stripe/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/api/stripe/checkout' | '/api/stripe/portal' | '/api/stripe/webhook'
+    | '/'
+    | '/bench'
+    | '/api/stripe/checkout'
+    | '/api/stripe/portal'
+    | '/api/stripe/webhook'
   id:
     | '__root__'
     | '/'
+    | '/bench'
     | '/api/stripe/checkout'
     | '/api/stripe/portal'
     | '/api/stripe/webhook'
@@ -71,6 +89,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BenchRoute: typeof BenchRoute
   ApiStripeCheckoutRoute: typeof ApiStripeCheckoutRoute
   ApiStripePortalRoute: typeof ApiStripePortalRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
@@ -83,6 +102,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bench': {
+      id: '/bench'
+      path: '/bench'
+      fullPath: '/bench'
+      preLoaderRoute: typeof BenchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stripe/webhook': {
@@ -111,6 +137,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BenchRoute: BenchRoute,
   ApiStripeCheckoutRoute: ApiStripeCheckoutRoute,
   ApiStripePortalRoute: ApiStripePortalRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,

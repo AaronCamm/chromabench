@@ -54,7 +54,10 @@ export const Route = createFileRoute("/api/stripe/checkout")({
               metadata: { supabase_user_id: user.id },
             });
             customerId = customer.id;
-            await admin.from("profiles").update({ stripe_customer_id: customerId }).eq("id", user.id);
+            await admin
+              .from("profiles")
+              .update({ stripe_customer_id: customerId })
+              .eq("id", user.id);
           }
 
           const session = await stripe.checkout.sessions.create({
@@ -66,13 +69,16 @@ export const Route = createFileRoute("/api/stripe/checkout")({
               metadata: { supabase_user_id: user.id },
             },
             metadata: { supabase_user_id: user.id },
-            success_url: `${appUrl}/?checkout=success#tool`,
-            cancel_url: `${appUrl}/?checkout=cancel#tool`,
+            success_url: `${appUrl}/bench?checkout=success`,
+            cancel_url: `${appUrl}/bench?checkout=cancel`,
             allow_promotion_codes: true,
           });
 
           if (!session.url) {
-            return Response.json({ error: "Stripe did not return a checkout URL" }, { status: 500 });
+            return Response.json(
+              { error: "Stripe did not return a checkout URL" },
+              { status: 500 },
+            );
           }
 
           return Response.json({ url: session.url });

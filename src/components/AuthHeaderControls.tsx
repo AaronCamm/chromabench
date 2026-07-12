@@ -25,12 +25,12 @@ export function AuthHeaderControls() {
     if (checkout === "success") {
       toast.success("Trial started — welcome to Chromabench");
       params.delete("checkout");
-      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash || "#tool"}`;
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     } else if (checkout === "cancel") {
       toast.message("Checkout canceled");
       params.delete("checkout");
-      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash || "#tool"}`;
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     }
   }, []);

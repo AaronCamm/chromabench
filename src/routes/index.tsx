@@ -1,6 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PaintConverter } from "@/components/PaintConverter";
-import { AuthHeaderControls } from "@/components/AuthHeaderControls";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { BRANDS, PAINTS } from "@/data/paints";
 
 export const Route = createFileRoute("/")({
@@ -10,58 +9,14 @@ export const Route = createFileRoute("/")({
 function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Header />
+      <SiteHeader active="home" />
       <main>
         <Hero />
-        <ToolSection />
         <BrandsSection />
         <MethodSection />
       </main>
-      <Footer />
+      <SiteFooter />
     </div>
-  );
-}
-
-function Header() {
-  return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
-      <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-3 md:px-8">
-        <a href="/" className="flex items-center gap-2">
-          <span className="h-5 w-5 bg-accent" aria-hidden />
-          <span className="mono text-sm font-bold tracking-tight">CHROMABENCH</span>
-          <span className="mono text-[10px] text-muted-foreground uppercase tracking-widest hidden sm:inline">
-            v0.1
-          </span>
-        </a>
-        <nav className="flex items-center gap-1">
-          <a
-            href="#tool"
-            className="mono text-[11px] uppercase tracking-widest px-3 py-2 hover:bg-surface hidden sm:inline"
-          >
-            Tool
-          </a>
-          <a
-            href="#brands"
-            className="mono text-[11px] uppercase tracking-widest px-3 py-2 hover:bg-surface hidden md:inline"
-          >
-            Brands
-          </a>
-          <a
-            href="#method"
-            className="mono text-[11px] uppercase tracking-widest px-3 py-2 hover:bg-surface hidden md:inline"
-          >
-            Method
-          </a>
-          <AuthHeaderControls />
-          <a
-            href="#tool"
-            className="mono text-[11px] uppercase tracking-widest ml-1 bg-foreground text-background px-3 py-2 hover:bg-accent hidden sm:inline"
-          >
-            Open bench →
-          </a>
-        </nav>
-      </div>
-    </header>
   );
 }
 
@@ -87,6 +42,21 @@ function Hero() {
           multi-brand mix recipes so you can keep working with what's on your bench.
         </p>
 
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            to="/bench"
+            className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-5 py-3 hover:bg-accent"
+          >
+            Open bench →
+          </Link>
+          <a
+            href="#method"
+            className="mono text-[11px] uppercase tracking-widest border border-border px-5 py-3 hover:bg-surface"
+          >
+            How it works
+          </a>
+        </div>
+
         <div className="mt-10 grid grid-cols-2 gap-px border border-border bg-border md:grid-cols-4">
           <Stat label="Brands" value={String(BRANDS.length)} />
           <Stat label="Paints indexed" value={String(PAINTS.length)} />
@@ -109,19 +79,6 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ToolSection() {
-  return (
-    <section id="tool" className="border-b border-border bg-surface">
-      <div className="mx-auto max-w-[1400px] px-5 py-14 md:px-8 md:py-20">
-        <SectionHeader num="02" title="The bench" caption="Search, match, mix." />
-        <div className="mt-8">
-          <PaintConverter />
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function BrandsSection() {
   const groups = BRANDS.map((b) => {
     const list = PAINTS.filter((p) => p.brand === b);
@@ -130,7 +87,7 @@ function BrandsSection() {
   return (
     <section id="brands" className="border-b border-border">
       <div className="mx-auto max-w-[1400px] px-5 py-14 md:px-8 md:py-20">
-        <SectionHeader num="03" title="Indexed brands" caption="Curated, growing." />
+        <SectionHeader num="02" title="Indexed brands" caption="Curated, growing." />
         <div className="mt-8 grid gap-px bg-border border border-border md:grid-cols-2 lg:grid-cols-4">
           {groups.map((g) => (
             <div key={g.brand} className="bg-background p-4">
@@ -179,7 +136,7 @@ function MethodSection() {
   return (
     <section id="method" className="border-b border-border bg-surface">
       <div className="mx-auto max-w-[1400px] px-5 py-14 md:px-8 md:py-20">
-        <SectionHeader num="04" title="Method" caption="How the bench thinks." />
+        <SectionHeader num="03" title="Method" caption="How the bench thinks." />
         <div className="mt-8 grid gap-px bg-border border border-border md:grid-cols-3">
           {items.map((i) => (
             <div key={i.n} className="bg-background p-6">
@@ -190,6 +147,14 @@ function MethodSection() {
               <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{i.d}</p>
             </div>
           ))}
+        </div>
+        <div className="mt-8">
+          <Link
+            to="/bench"
+            className="inline-flex mono text-[11px] uppercase tracking-widest bg-foreground text-background px-5 py-3 hover:bg-accent"
+          >
+            Open the bench →
+          </Link>
         </div>
         <p className="mt-6 mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Note — hex values are best-effort approximations of published swatches. Always test on a
@@ -213,24 +178,5 @@ function SectionHeader({ num, title, caption }: { num: string; title: string; ca
         {caption}
       </div>
     </div>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-5 py-8 md:flex-row md:items-center md:justify-between md:px-8">
-        <div className="flex items-center gap-2">
-          <span className="h-4 w-4 bg-accent" aria-hidden />
-          <span className="mono text-xs font-bold tracking-tight">CHROMABENCH</span>
-          <span className="mono text-[10px] text-muted-foreground uppercase tracking-widest">
-            Independent · not affiliated with any manufacturer
-          </span>
-        </div>
-        <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Built for hobbyists. Corrections welcome.
-        </div>
-      </div>
-    </footer>
   );
 }
