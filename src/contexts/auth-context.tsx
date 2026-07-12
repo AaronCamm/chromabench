@@ -47,12 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [favourites, setFavourites] = useState<FavouriteRecipe[]>([]);
 
-  const refreshAccess = useCallback(async () => {
+  const applySession = useCallback(async (current: Session | null) => {
     if (!configured) return;
-    const supabase = getSupabaseBrowserClient();
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
     setSession(current);
 
     if (!current?.user) {
@@ -62,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const supabase = getSupabaseBrowserClient();
     const userId = current.user.id;
 
     const [profileRes, subRes, favRes] = await Promise.all([
@@ -86,6 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setFavourites((favRes.data as FavouriteRecipe[] | null) ?? []);
   }, [configured]);
 
+  const refreshAccess = useCallback(async () => {
+    if (!configured) return;
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { session: current },
+    } = await supabase.auth.getSession();
+    await applySession(current);
+  }, [configured, applySession]);
+
   useEffect(() => {
     if (!configured) {
       setLoading(false);
@@ -95,23 +101,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     const supabase = getSupabaseBrowserClient();
 
-    (async () => {
-      await refreshAccess();
-      if (mounted) setLoading(false);
-    })();
-
+    // Use the session from the auth event — calling getSession() inside
+    // onAuthStateChange can deadlock and leave the bench stuck on "Loading…".
     const {
       data: { subscription: authSub },
-    } = supabase.auth.onAuthStateChange(async () => {
-      await refreshAccess();
-      if (mounted) setLoading(false);
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void (async () => {
+        try {
+          await applySession(nextSession);
+        } finally {
+          if (mounted) setLoading(false);
+        }
+      })();
     });
 
     return () => {
       mounted = false;
       authSub.unsubscribe();
     };
-  }, [configured, refreshAccess]);
+  }, [configured, applySession]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const supabase = getSupabaseBrowserClient();
