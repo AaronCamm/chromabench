@@ -19,13 +19,8 @@ export function AccessGate({
 
   if (loading) {
     return (
-      <div className="relative">
-        <div className="pointer-events-none opacity-40">{children}</div>
-        <div className="absolute inset-0 flex items-center justify-center bg-background/70 p-6">
-          <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground">
-            Loading…
-          </p>
-        </div>
+      <div className="min-h-[28rem] flex items-center justify-center border border-border bg-card p-6">
+        <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground">Loading…</p>
       </div>
     );
   }
@@ -58,57 +53,54 @@ export function AccessGate({
   };
 
   return (
-    <div className="relative">
-      <div className="pointer-events-none select-none opacity-30 blur-[1px]">{children}</div>
-      <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 p-5 backdrop-blur-[2px]">
-        <div className="max-w-md w-full border border-border bg-card p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Lock className="h-4 w-4" />
-            <h3 className="text-sm font-semibold tracking-tight">{feature} requires access</h3>
-          </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {signedIn
-              ? "Start a 7-day free trial, then $5/month. Cancel anytime from the billing portal."
-              : "Sign in or create an account to use the bench. Includes a 7-day free trial, then $5/month."}
-          </p>
-          {subscription?.status &&
-            subscription.status !== "trialing" &&
-            subscription.status !== "active" && (
-              <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                Subscription status: {subscription.status}
-              </p>
-            )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex flex-wrap gap-2">
-            {!signedIn ? (
+    <div className="min-h-[28rem] flex items-center justify-center border border-border bg-card p-5 md:p-10">
+      <div className="max-w-md w-full space-y-4">
+        <div className="flex items-center gap-2">
+          <Lock className="h-4 w-4" />
+          <h3 className="text-sm font-semibold tracking-tight">{feature} requires access</h3>
+        </div>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {signedIn
+            ? "Start a 7-day free trial, then $5/month. Cancel anytime from the billing portal."
+            : "Sign in or create an account to use the bench. Includes a 7-day free trial, then $5/month."}
+        </p>
+        {subscription?.status &&
+          subscription.status !== "trialing" &&
+          subscription.status !== "active" && (
+            <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Subscription status: {subscription.status}
+            </p>
+          )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          {!signedIn ? (
+            <button
+              type="button"
+              onClick={() => setAuthOpen(true)}
+              className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent"
+            >
+              Sign in / Sign up
+            </button>
+          ) : (
+            <>
               <button
                 type="button"
-                onClick={() => setAuthOpen(true)}
-                className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent"
+                disabled={busy}
+                onClick={onCheckout}
+                className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent disabled:opacity-50"
               >
-                Sign in / Sign up
+                {busy ? "Redirecting…" : "Start 7-day trial"}
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onCheckout}
-                  className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent disabled:opacity-50"
-                >
-                  {busy ? "Redirecting…" : "Start 7-day trial"}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onPortal}
-                  className="mono text-[11px] uppercase tracking-widest border border-border px-4 py-2.5 hover:bg-surface disabled:opacity-50"
-                >
-                  Manage billing
-                </button>
-              </>
-            )}
-          </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onPortal}
+                className="mono text-[11px] uppercase tracking-widest border border-border px-4 py-2.5 hover:bg-surface disabled:opacity-50"
+              >
+                Manage billing
+              </button>
+            </>
+          )}
         </div>
       </div>
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} initialMode="signup" />

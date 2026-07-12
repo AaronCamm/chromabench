@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { AccessGate } from "@/components/AccessGate";
 import { PaintConverter } from "@/components/PaintConverter";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
@@ -34,7 +35,9 @@ function BenchPage() {
             </p>
           </div>
           <div className="mt-8">
-            <PaintConverter />
+            <AccessGate feature="The bench">
+              <PaintConverter />
+            </AccessGate>
           </div>
           <p className="mt-8 mono text-[11px] uppercase tracking-widest text-muted-foreground">
             New here?{" "}

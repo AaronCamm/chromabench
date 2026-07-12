@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { PAINTS, BRANDS, type Paint } from "@/data/paints";
 import { contrastText, deltaE, hexToLab, mixHex } from "@/lib/color";
 import { Search, Plus, X, ArrowRight, Beaker, Target, Shuffle, Heart } from "lucide-react";
-import { AccessGate } from "@/components/AccessGate";
 import { FavouriteButton, FavouritesPanel } from "@/components/FavouritesPanel";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
@@ -54,12 +53,10 @@ export function PaintConverter() {
         />
       </div>
       <div className="border border-t-0 border-border bg-card">
-        <AccessGate feature="The bench">
-          {tab === "equivalents" && <EquivalentsPanel />}
-          {tab === "mixer" && <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />}
-          {tab === "recipe" && <RecipePanel onLoadMixer={loadMixer} />}
-          {tab === "favourites" && <FavouritesPanel onLoadMixer={loadMixer} />}
-        </AccessGate>
+        {tab === "equivalents" && <EquivalentsPanel />}
+        {tab === "mixer" && <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />}
+        {tab === "recipe" && <RecipePanel onLoadMixer={loadMixer} />}
+        {tab === "favourites" && <FavouritesPanel onLoadMixer={loadMixer} />}
       </div>
     </div>
   );
