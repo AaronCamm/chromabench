@@ -121,7 +121,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(async (email: string, password: string) => {
     const supabase = getSupabaseBrowserClient();
-    const { error } = await supabase.auth.signUp({ email, password });
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/bench`
+        : "https://chromabench.com/bench";
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo },
+    });
     return { error: error?.message ?? null };
   }, []);
 

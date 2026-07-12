@@ -7,7 +7,10 @@ Chromabench uses **Supabase** (auth + Postgres) and **Stripe** ($5/month with a 
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the SQL editor, run [`supabase/migrations/001_init.sql`](../supabase/migrations/001_init.sql).
 3. Authentication → Providers → Email: enable Email. For local/dev you can disable “Confirm email”.
-4. Copy **Project URL** and **anon** / **service_role** keys into `.env` (see [`.env.example`](../.env.example)).
+4. Authentication → URL Configuration:
+   - **Site URL:** `https://chromabench.com`
+   - **Redirect URLs:** add `https://chromabench.com/**`, `https://www.chromabench.com/**`, and `http://localhost:5173/**` for local dev
+5. Copy **Project URL** and **anon** / **service_role** keys into `.env` (see [`.env.example`](../.env.example)).
 
 ## 2. Stripe
 
