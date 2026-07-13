@@ -43,6 +43,9 @@ Rules for citedUrlAction:
   never …/douglas-a-20g-havoc/).
 - "clear" only if the URL is wrong and you do NOT know a correct replacement.
 - Prefer "replace" over "clear" whenever you know the right page.
+- On museum CMS sites (e.g. nationalmuseum.af.mil), the numeric Article/ID is authoritative —
+  a plausible slug on the wrong ID will redirect to a different aircraft. Prefer the URL that
+  actually loads the right title.
 - Never invent URL paths you are unsure of.
 
 Rules for colours:

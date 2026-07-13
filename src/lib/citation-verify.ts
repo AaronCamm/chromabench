@@ -38,6 +38,9 @@ const STOP_WORDS = new Set([
   "aircraft",
 ]);
 
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 function isPrivateOrLocalHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, "");
   if (BLOCKED_HOSTS.has(host)) return true;
@@ -126,9 +129,91 @@ function designationsConflict(draft: CitationDraft, query: string | undefined, s
   return !urlCodes.some((u) => draftCodes.includes(u));
 }
 
+function pathMatchesSubject(
+  pathname: string,
+  draft: CitationDraft,
+  query: string | undefined,
+  tokens: string[],
+): boolean {
+  const slug = pathSlug(pathname);
+  if (designationsConflict(draft, query, slug)) return false;
+  const pathHits = Math.max(
+    countHits(slug.replace(/-/g, " "), tokens) + countHits(slug, tokens),
+    countHits(pathname.toLowerCase(), tokens),
+  );
+  return pathHits >= 1;
+}
+
+function resolveRedirectUrl(base: URL, location: string): URL | null {
+  try {
+    return new URL(location, base);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Fetch a candidate citation and keep it only if the URL (and title when available)
- * is about this model — not merely the same museum site with shared navigation.
+ * Fetch following redirects manually so CMS sites that ignore the slug
+ * (article ID → canonical slug) are judged on the FINAL URL, not the claimed one.
+ */
+async function fetchCitationPage(
+  start: URL,
+  signal: AbortSignal,
+): Promise<{ finalUrl: URL; status: number; html?: string }> {
+  let current = start;
+  for (let hop = 0; hop < 6; hop++) {
+    const res = await fetch(current.toString(), {
+      method: "GET",
+      redirect: "manual",
+      signal,
+      headers: {
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "User-Agent": BROWSER_UA,
+      },
+    });
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) {
+        return { finalUrl: current, status: res.status };
+      }
+      const next = resolveRedirectUrl(current, location);
+      if (!next) return { finalUrl: current, status: res.status };
+      if (isPrivateOrLocalHost(next.hostname)) {
+        return { finalUrl: next, status: 403 };
+      }
+      // Prefer https if museum redirects to http
+      if (next.protocol === "http:" && start.protocol === "https:") {
+        next.protocol = "https:";
+      }
+      current = next;
+      continue;
+    }
+
+    if (!res.ok) {
+      return { finalUrl: current, status: res.status };
+    }
+
+    const contentType = res.headers.get("content-type") ?? "";
+    if (
+      contentType &&
+      !/text\/html|text\/plain|application\/xhtml/i.test(contentType) &&
+      !contentType.includes("charset")
+    ) {
+      return { finalUrl: current, status: 415 };
+    }
+
+    const html = (await res.text()).slice(0, 250_000);
+    return { finalUrl: current, status: res.status, html };
+  }
+
+  return { finalUrl: current, status: 310 };
+}
+
+/**
+ * Fetch a candidate citation and keep it only if the FINAL page (after redirects)
+ * is about this model. Museum fact sheets use article IDs — a forged Liberator slug
+ * on a Spitfire article ID must be rejected.
  */
 export async function verifyCitationUrl(
   url: string | undefined,
@@ -160,118 +245,63 @@ export async function verifyCitationUrl(
     return { status: "rejected", reason: "Not enough context to verify citation" };
   }
 
-  const slug = pathSlug(parsed.pathname);
-  const pathHaystack = parsed.pathname.toLowerCase();
-  const slugHits = countHits(slug.replace(/-/g, " "), tokens) + countHits(slug, tokens);
-  // Deduplicate-ish: also count path without double-counting via max of slug-focused
-  const pathHits = Math.max(slugHits, countHits(pathHaystack, tokens));
-
-  if (designationsConflict(draft, query, slug)) {
-    return {
-      status: "rejected",
-      reason: "Citation URL is for a different aircraft type",
-    };
-  }
-
-  // URL path must look like this subject — museum hubs share nav text across pages.
-  if (pathHits < 1) {
-    return {
-      status: "rejected",
-      reason: "Citation URL does not name this model/scheme",
-    };
+  // Quick reject on the claimed path when it already names a different type
+  if (!pathMatchesSubject(parsed.pathname, draft, query, tokens)) {
+    // Still fetch — some sites redirect a wrong slug to the right article.
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(parsed.toString(), {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-        "User-Agent":
-          "Mozilla/5.0 (compatible; ChromabenchCitationCheck/1.0; +https://chromabench.com)",
-      },
-    });
+    const page = await fetchCitationPage(parsed, controller.signal);
 
-    const finalUrl = res.url || parsed.toString();
-    let finalParsed = parsed;
-    try {
-      finalParsed = new URL(finalUrl);
-    } catch {
-      /* keep */
-    }
-    if (isPrivateOrLocalHost(finalParsed.hostname)) {
+    if (isPrivateOrLocalHost(page.finalUrl.hostname)) {
       return { status: "rejected", reason: "Citation redirected to a blocked host" };
     }
 
-    const finalSlug = pathSlug(finalParsed.pathname);
-    if (designationsConflict(draft, query, finalSlug)) {
+    // Judged on the destination after redirects — not the AI-claimed slug.
+    if (!pathMatchesSubject(page.finalUrl.pathname, draft, query, tokens)) {
       return {
         status: "rejected",
-        reason: "Citation URL is for a different aircraft type",
+        reason: "Citation redirects to a different aircraft page",
       };
     }
-    const finalPathHits = Math.max(
-      countHits(finalSlug.replace(/-/g, " "), tokens) + countHits(finalSlug, tokens),
-      countHits(finalParsed.pathname.toLowerCase(), tokens),
-    );
-    if (finalPathHits < 1) {
+
+    if (page.status === 401 || page.status === 403 || page.status === 429) {
+      // Do not trust a claimed slug we could not load (CMS IDs are authoritative).
       return {
         status: "rejected",
-        reason: "Citation URL does not name this model/scheme",
+        reason: "Could not verify citation page (site blocked the check)",
       };
     }
 
-    if (res.status === 401 || res.status === 403 || res.status === 429) {
-      return {
-        url: parsed.toString(),
-        status: "needs_review",
-        reason: "Site blocked automated checks — please open and confirm the link",
-      };
-    }
-
-    if (!res.ok) {
-      return { status: "rejected", reason: `Citation page returned ${res.status}` };
-    }
-
-    const contentType = res.headers.get("content-type") ?? "";
-    if (
-      contentType &&
-      !/text\/html|text\/plain|application\/xhtml/i.test(contentType) &&
-      !contentType.includes("charset")
-    ) {
+    if (page.status === 415) {
       return { status: "rejected", reason: "Citation is not an HTML page" };
     }
 
-    const html = (await res.text()).slice(0, 250_000);
-    const titleSignals = extractTitleSignals(html);
+    if (page.status < 200 || page.status >= 300 || !page.html) {
+      return { status: "rejected", reason: `Citation page returned ${page.status}` };
+    }
+
+    const titleSignals = extractTitleSignals(page.html);
     const titleHits = countHits(titleSignals, tokens);
     const needed = Math.min(2, tokens.length);
+    const canonical = page.finalUrl.toString();
 
     if (titleHits >= needed) {
-      return { url: finalUrl, status: "verified" };
+      return { url: canonical, status: "verified" };
     }
 
-    // Path already matched; title incomplete (JS site) — ask the user to confirm.
-    if (finalPathHits >= 1) {
-      return {
-        url: finalUrl,
-        status: "needs_review",
-        reason: "Could not confirm page title — please open and confirm it’s the right aircraft",
-      };
-    }
-
+    // Final path matched but title was thin — still keep canonical URL for review.
     return {
-      status: "rejected",
-      reason: "Page title does not match this model/scheme",
+      url: canonical,
+      status: "needs_review",
+      reason: "Could not confirm page title — please open and confirm it’s the right aircraft",
     };
   } catch {
     return {
-      url: parsed.toString(),
-      status: "needs_review",
-      reason: "Could not reach citation URL — please open and confirm",
+      status: "rejected",
+      reason: "Could not reach citation URL",
     };
   } finally {
     clearTimeout(timer);
