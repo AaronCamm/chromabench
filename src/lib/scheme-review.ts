@@ -354,6 +354,108 @@ Never return a URL for a different aircraft type. If unsure, set url to null and
   }
 }
 
+/**
+ * Suggest a direct Wikimedia upload image URL when the draft has none.
+ */
+export async function suggestReferenceImageWithOpenAI(
+  draft: SchemeLookupDraft,
+  query: string,
+  notes?: string,
+): Promise<{ url?: string; credit?: string; summary?: string; skipped?: boolean; reason?: string }> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    return { skipped: true, reason: "OPENAI_API_KEY not configured" };
+  }
+
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1";
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.1,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "image_suggest",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              certainty: { type: "string", enum: ["high", "medium", "low"] },
+              url: { type: ["string", "null"] },
+              credit: { type: ["string", "null"] },
+              summary: { type: "string" },
+            },
+            required: ["certainty", "url", "credit", "summary"],
+          },
+        },
+      },
+      messages: [
+        {
+          role: "system",
+          content: `You suggest one direct Wikimedia Commons image file URL for a specific aircraft/vehicle.
+Return only an https://upload.wikimedia.org/... URL (not a commons File: HTML page).
+The photo must depict THIS subject. Include a short credit string.
+If unsure of an exact upload.wikimedia.org URL, set url to null.`,
+        },
+        {
+          role: "user",
+          content: [
+            `Request: ${query.trim()}`,
+            notes?.trim() ? `Notes: ${notes.trim()}` : null,
+            `Model: ${draft.modelName}`,
+            `Scheme: ${draft.schemeName}`,
+            draft.aliases?.length ? `Aliases: ${draft.aliases.join(", ")}` : null,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.warn("OpenAI image suggest failed", res.status, body.slice(0, 200));
+    return { reason: `OpenAI image suggest failed (${res.status})` };
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const raw = data.choices?.[0]?.message?.content;
+  if (!raw) return { reason: "Empty image suggest response" };
+
+  try {
+    const payload = JSON.parse(raw) as {
+      certainty?: string;
+      url?: string | null;
+      credit?: string | null;
+      summary?: string;
+    };
+    const url = typeof payload.url === "string" ? payload.url.trim() : "";
+    if (
+      (payload.certainty === "high" || payload.certainty === "medium") &&
+      url &&
+      looksLikeHttpUrl(url)
+    ) {
+      return {
+        url,
+        credit: typeof payload.credit === "string" ? payload.credit.trim() : undefined,
+        summary: payload.summary,
+      };
+    }
+    return { reason: payload.summary || "No confident reference image" };
+  } catch {
+    return { reason: "Invalid image suggest JSON" };
+  }
+}
+
 function normalizeReviewColors(
   colors: NonNullable<ReviewPayload["colors"]>,
 ): SchemeColorCallout[] {

@@ -394,6 +394,9 @@ export function ModelsPanel({
               setCitationReason(null);
               setPendingCitationUrl(null);
             }}
+            onClearImage={() => {
+              setDraft((d) => (d ? { ...d, imageUrl: undefined, imageCredit: undefined } : d));
+            }}
             onCancel={() => {
               setRequestStep("idle");
               setDraft(null);
@@ -432,6 +435,7 @@ function EmptySearchRequest({
   onConfirm,
   onIncludePendingCitation,
   onClearCitation,
+  onClearImage,
   onCancel,
   onBackToForm,
 }: {
@@ -455,6 +459,7 @@ function EmptySearchRequest({
   onConfirm: () => void;
   onIncludePendingCitation: () => void;
   onClearCitation: () => void;
+  onClearImage: () => void;
   onCancel: () => void;
   onBackToForm: () => void;
 }) {
@@ -487,6 +492,27 @@ function EmptySearchRequest({
             </p>
           )}
         </div>
+        {draft.imageUrl && (
+          <figure className="space-y-2">
+            <img
+              src={draft.imageUrl}
+              alt={draft.schemeName}
+              className="w-full max-h-56 object-cover border border-border bg-surface"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <figcaption className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                {draft.imageCredit ?? "Reference image"}
+              </figcaption>
+              <button
+                type="button"
+                onClick={onClearImage}
+                className="mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+              >
+                Remove image
+              </button>
+            </div>
+          </figure>
+        )}
         {draft.colors.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No reliable colour callouts found. Try a more specific request (operator, year, or
@@ -699,11 +725,19 @@ function SchemeListRow({ scheme, onClick }: { scheme: PaintScheme; onClick: () =
       onClick={onClick}
       className="flex items-center gap-3 border border-border p-3 text-left hover:bg-surface w-full"
     >
-      <div className="flex h-8 w-24 shrink-0 overflow-hidden border border-border">
-        {swatches.map((hex, i) => (
-          <span key={i} className="flex-1" style={{ backgroundColor: hex }} />
-        ))}
-      </div>
+      {scheme.imageUrl ? (
+        <img
+          src={scheme.imageUrl}
+          alt=""
+          className="h-12 w-20 shrink-0 object-cover border border-border bg-surface"
+        />
+      ) : (
+        <div className="flex h-8 w-24 shrink-0 overflow-hidden border border-border">
+          {swatches.map((hex, i) => (
+            <span key={i} className="flex-1" style={{ backgroundColor: hex }} />
+          ))}
+        </div>
+      )}
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium truncate">{scheme.name}</span>
         <span className="mono text-[10px] text-muted-foreground uppercase tracking-widest">
@@ -787,6 +821,21 @@ function SchemeDetail({
           }}
         />
       </div>
+
+      {scheme.imageUrl && (
+        <figure className="space-y-2">
+          <img
+            src={scheme.imageUrl}
+            alt={`${model.name} — ${scheme.name}`}
+            className="w-full max-h-80 object-cover border border-border bg-surface"
+          />
+          {scheme.imageCredit && (
+            <figcaption className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {scheme.imageCredit}
+            </figcaption>
+          )}
+        </figure>
+      )}
 
       {model.schemes.length > 1 && (
         <div className="flex flex-wrap gap-1">

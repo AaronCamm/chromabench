@@ -25,6 +25,9 @@ export type PaintScheme = {
   buno?: string;
   colors: SchemeColorCallout[];
   sources: SchemeSource[];
+  /** Optional reference photo (prefer Wikimedia / attributed public URLs). */
+  imageUrl?: string;
+  imageCredit?: string;
 };
 
 export type ModelSubject = {

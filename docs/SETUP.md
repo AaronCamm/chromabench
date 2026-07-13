@@ -87,4 +87,4 @@ Run [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002
 
 When search finds nothing, signed-in subscribers can **Request this model**. Claude looks up FS callouts; an optional OpenAI second pass can correct wrong citation URLs (and colours) when certain. After the user confirms, the scheme is stored in Supabase (`community_models` / `community_schemes`) with source **User Added** and appears in Models search for everyone signed in.
 
-Run [`supabase/migrations/003_community_schemes.sql`](../supabase/migrations/003_community_schemes.sql) and set `ANTHROPIC_API_KEY` on Vercel for that flow. Optionally set `OPENAI_API_KEY` (and `OPENAI_MODEL`, default `gpt-4.1`) for the cross-check/correction pass.
+Run [`supabase/migrations/003_community_schemes.sql`](../supabase/migrations/003_community_schemes.sql) and [`supabase/migrations/004_scheme_images.sql`](../supabase/migrations/004_scheme_images.sql), then set `ANTHROPIC_API_KEY` on Vercel for that flow. Optionally set `OPENAI_API_KEY` (and `OPENAI_MODEL`, default `gpt-4.1`) for the cross-check/correction pass. Reference images use verified Wikimedia `upload.wikimedia.org` URLs only.

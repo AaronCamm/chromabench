@@ -2,9 +2,11 @@ import type { ModelCategory, SchemeColorCallout, SchemeSource } from "@/data/mod
 import { resolveCalloutPaint } from "@/lib/fs-paints";
 import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 import { verifyCitationUrl } from "@/lib/citation-verify";
+import { verifyReferenceImageUrl } from "@/lib/image-verify";
 import {
   reviewSchemeDraftWithOpenAI,
   suggestCitationUrlWithOpenAI,
+  suggestReferenceImageWithOpenAI,
   type SchemeReviewMeta,
 } from "@/lib/scheme-review";
 
@@ -21,6 +23,9 @@ export type SchemeLookupDraft = {
   confidence: "high" | "medium" | "low" | "unknown";
   notes?: string;
   citedUrl?: string;
+  /** Direct Wikimedia upload URL when known. */
+  imageUrl?: string;
+  imageCredit?: string;
 };
 
 export type SchemeLookupResult = {
@@ -49,6 +54,9 @@ Rules:
   (Cybermodeler, museum fact sheets, IPMS, warbird registry, etc.). Never invent or guess a URL path.
   The URL path/slug must name this aircraft (e.g. …/consolidated-b-24d-liberator/), not a
   different type on the same site. If you are not sure the exact URL is correct, omit citedUrl.
+- imageUrl: optional direct https Wikimedia upload URL (upload.wikimedia.org/…) of THIS aircraft/scheme.
+  Prefer well-known museum photos on Commons. Include imageCredit (e.g. "Photo: USAF / Wikimedia Commons").
+  Omit if you do not know a real direct file URL.
 - Respond with JSON only matching the schema.`;
 
 export async function lookupSchemeWithClaude(
@@ -117,6 +125,15 @@ export async function lookupSchemeWithClaude(
                 description:
                   "Exact public URL for this aircraft/scheme only if known; omit if unsure",
               },
+              imageUrl: {
+                type: "string",
+                description:
+                  "Direct https upload.wikimedia.org image URL for this aircraft only if known",
+              },
+              imageCredit: {
+                type: "string",
+                description: "Short attribution for the image, e.g. Photo: USAF / Wikimedia Commons",
+              },
             },
             required: ["modelName", "category", "schemeName", "colors", "confidence"],
           },
@@ -170,6 +187,33 @@ export async function lookupSchemeWithClaude(
     reviewed.citedUrl = citation.url;
   } else {
     reviewed.citedUrl = undefined;
+  }
+
+  // Reference image (Wikimedia direct uploads only)
+  let image = await verifyReferenceImageUrl(reviewed.imageUrl);
+  if (image.status !== "verified") {
+    const suggestedImage = await suggestReferenceImageWithOpenAI(reviewed, query, notes);
+    if (suggestedImage.url) {
+      image = await verifyReferenceImageUrl(suggestedImage.url);
+      if (image.status === "verified") {
+        reviewed.imageCredit =
+          suggestedImage.credit?.trim() || reviewed.imageCredit || "Wikimedia Commons";
+        review = {
+          ...review,
+          applied: true,
+          summary: suggestedImage.summary
+            ? `${review.summary ? `${review.summary} · ` : ""}${suggestedImage.summary}`
+            : review.summary ?? "Added reference image from cross-check",
+        };
+      }
+    }
+  }
+  if (image.status === "verified") {
+    reviewed.imageUrl = image.url;
+    if (!reviewed.imageCredit?.trim()) reviewed.imageCredit = "Wikimedia Commons";
+  } else {
+    reviewed.imageUrl = undefined;
+    reviewed.imageCredit = undefined;
   }
 
   return {
@@ -226,6 +270,8 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
     : [];
 
   const rawUrl = typeof input.citedUrl === "string" ? input.citedUrl.trim() : "";
+  const rawImage = typeof input.imageUrl === "string" ? input.imageUrl.trim() : "";
+  const rawCredit = typeof input.imageCredit === "string" ? input.imageCredit.trim() : "";
 
   return {
     modelName: String(input.modelName ?? "Unknown model").trim(),
@@ -240,6 +286,8 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
     confidence: conf,
     notes: typeof input.notes === "string" ? input.notes : undefined,
     citedUrl: rawUrl || undefined,
+    imageUrl: rawImage || undefined,
+    imageCredit: rawCredit || undefined,
   };
 }
 
