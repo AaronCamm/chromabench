@@ -3,7 +3,7 @@ import { requireUserFromRequest } from "@/lib/api-auth";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import { lookupSchemeWithClaude } from "@/lib/scheme-lookup";
 
-const MAX_LOOKUPS_PER_HOUR = 5;
+const MAX_LOOKUPS_PER_HOUR = 20;
 
 export const Route = createFileRoute("/api/models/lookup")({
   server: {
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/models/lookup")({
           }
           if ((count ?? 0) >= MAX_LOOKUPS_PER_HOUR) {
             return Response.json(
-              { error: "Lookup limit reached (5 per hour). Try again later." },
+              { error: "Lookup limit reached (20 per hour). Try again later." },
               { status: 429 },
             );
           }
