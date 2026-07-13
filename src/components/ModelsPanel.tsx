@@ -18,7 +18,6 @@ import { useAuth } from "@/contexts/auth-context";
 import { fetchCommunityModels } from "@/lib/community-models";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { SchemeLookupDraft } from "@/lib/scheme-lookup";
-import type { CommonsImageOption } from "@/lib/wikimedia-image";
 import { toast } from "sonner";
 
 type ModelsPanelProps = {
@@ -54,7 +53,6 @@ export function ModelsPanel({
   >(null);
   const [citationReason, setCitationReason] = useState<string | null>(null);
   const [pendingCitationUrl, setPendingCitationUrl] = useState<string | null>(null);
-  const [imageOptions, setImageOptions] = useState<CommonsImageOption[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
   const [busyConfirm, setBusyConfirm] = useState(false);
 
@@ -125,7 +123,6 @@ export function ModelsPanel({
     setCitationStatus(null);
     setCitationReason(null);
     setPendingCitationUrl(null);
-    setImageOptions([]);
     setRequestStep("form");
   };
 
@@ -156,7 +153,6 @@ export function ModelsPanel({
           reason?: string;
           url?: string;
         };
-        imageOptions?: CommonsImageOption[];
         error?: string;
       };
       if (!res.ok || !body.draft) throw new Error(body.error ?? "Lookup failed");
@@ -166,7 +162,6 @@ export function ModelsPanel({
       );
       setCitationReason(body.citation?.reason ?? null);
       setPendingCitationUrl(null);
-      setImageOptions(Array.isArray(body.imageOptions) ? body.imageOptions.slice(0, 3) : []);
       setRequestStep("preview");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lookup failed");
@@ -208,7 +203,6 @@ export function ModelsPanel({
       setCitationStatus(null);
       setCitationReason(null);
       setPendingCitationUrl(null);
-      setImageOptions([]);
       setQuery("");
       toast.success(res.status === 409 ? "Scheme already exists — opened it" : "Scheme added");
     } catch (err) {
@@ -366,7 +360,6 @@ export function ModelsPanel({
             citationStatus={citationStatus}
             citationReason={citationReason}
             pendingCitationUrl={pendingCitationUrl}
-            imageOptions={imageOptions}
             busyConfirm={busyConfirm}
             signedIn={signedInUser}
             hasAccess={hasAccess}
@@ -387,21 +380,12 @@ export function ModelsPanel({
               setCitationReason(null);
               setPendingCitationUrl(null);
             }}
-            onSelectImage={(option) => {
-              setDraft((d) =>
-                d ? { ...d, imageUrl: option.url, imageCredit: option.credit } : d,
-              );
-            }}
-            onClearImage={() => {
-              setDraft((d) => (d ? { ...d, imageUrl: undefined, imageCredit: undefined } : d));
-            }}
             onCancel={() => {
               setRequestStep("idle");
               setDraft(null);
               setCitationStatus(null);
               setCitationReason(null);
               setPendingCitationUrl(null);
-              setImageOptions([]);
             }}
             onBackToForm={() => setRequestStep("form")}
           />
@@ -422,7 +406,6 @@ function EmptySearchRequest({
   citationStatus,
   citationReason,
   pendingCitationUrl,
-  imageOptions,
   busyConfirm,
   signedIn,
   hasAccess,
@@ -433,8 +416,6 @@ function EmptySearchRequest({
   onConfirm,
   onIncludePendingCitation,
   onClearCitation,
-  onSelectImage,
-  onClearImage,
   onCancel,
   onBackToForm,
 }: {
@@ -447,7 +428,6 @@ function EmptySearchRequest({
   citationStatus: "verified" | "needs_review" | "rejected" | "missing" | null;
   citationReason: string | null;
   pendingCitationUrl: string | null;
-  imageOptions: CommonsImageOption[];
   busyConfirm: boolean;
   signedIn: boolean;
   hasAccess: boolean;
@@ -458,8 +438,6 @@ function EmptySearchRequest({
   onConfirm: () => void;
   onIncludePendingCitation: () => void;
   onClearCitation: () => void;
-  onSelectImage: (option: CommonsImageOption) => void;
-  onClearImage: () => void;
   onCancel: () => void;
   onBackToForm: () => void;
 }) {
@@ -470,7 +448,7 @@ function EmptySearchRequest({
           Looking up colours…
         </p>
         <p className="text-sm text-muted-foreground">
-          Researching FS callouts, citation, and Commons reference photos.
+          Researching FS callouts and citation.
         </p>
       </div>
     );
@@ -487,65 +465,6 @@ function EmptySearchRequest({
           <p className="text-sm text-muted-foreground">{draft.schemeName}</p>
           {draft.notes && <p className="mt-2 text-sm text-muted-foreground">{draft.notes}</p>}
         </div>
-        {imageOptions.length > 0 && (
-          <div className="space-y-3">
-            <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Reference photo{imageOptions.length > 1 ? " · choose one" : ""}
-            </div>
-            {draft.imageUrl && (
-              <img
-                src={draft.imageUrl}
-                alt={draft.schemeName}
-                className="w-full aspect-[16/10] max-h-80 object-cover border border-border bg-surface"
-              />
-            )}
-            <div
-              className={`grid gap-3 ${
-                imageOptions.length === 1
-                  ? "grid-cols-1"
-                  : imageOptions.length === 2
-                    ? "grid-cols-2"
-                    : "grid-cols-1 sm:grid-cols-3"
-              }`}
-            >
-              {imageOptions.map((option) => {
-                const selected = draft.imageUrl === option.url;
-                return (
-                  <button
-                    key={option.url}
-                    type="button"
-                    onClick={() => onSelectImage(option)}
-                    className={`border text-left overflow-hidden transition-colors ${
-                      selected
-                        ? "border-foreground ring-1 ring-foreground"
-                        : "border-border hover:border-foreground/40"
-                    }`}
-                  >
-                    <img
-                      src={option.url}
-                      alt=""
-                      className="aspect-[4/3] w-full object-cover bg-surface"
-                    />
-                  </button>
-                );
-              })}
-            </div>
-            {draft.imageUrl ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  {draft.imageCredit ?? "Wikimedia Commons"}
-                </p>
-                <button
-                  type="button"
-                  onClick={onClearImage}
-                  className="mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
-                >
-                  No image
-                </button>
-              </div>
-            ) : null}
-          </div>
-        )}
         {draft.colors.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No reliable colour callouts found. Try a more specific request (operator, year, or
@@ -758,19 +677,11 @@ function SchemeListRow({ scheme, onClick }: { scheme: PaintScheme; onClick: () =
       onClick={onClick}
       className="flex items-center gap-3 border border-border p-3 text-left hover:bg-surface w-full"
     >
-      {scheme.imageUrl ? (
-        <img
-          src={scheme.imageUrl}
-          alt=""
-          className="h-16 w-24 shrink-0 object-cover border border-border bg-surface"
-        />
-      ) : (
-        <div className="flex h-8 w-24 shrink-0 overflow-hidden border border-border">
-          {swatches.map((hex, i) => (
-            <span key={i} className="flex-1" style={{ backgroundColor: hex }} />
-          ))}
-        </div>
-      )}
+      <div className="flex h-8 w-24 shrink-0 overflow-hidden border border-border">
+        {swatches.map((hex, i) => (
+          <span key={i} className="flex-1" style={{ backgroundColor: hex }} />
+        ))}
+      </div>
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium truncate">{scheme.name}</span>
         <span className="mono text-[10px] text-muted-foreground uppercase tracking-widest">
@@ -854,21 +765,6 @@ function SchemeDetail({
           }}
         />
       </div>
-
-      {scheme.imageUrl && (
-        <figure className="space-y-2">
-          <img
-            src={scheme.imageUrl}
-            alt={`${model.name} — ${scheme.name}`}
-            className="w-full aspect-[16/10] max-h-[28rem] object-cover border border-border bg-surface"
-          />
-          {scheme.imageCredit && (
-            <figcaption className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              {scheme.imageCredit}
-            </figcaption>
-          )}
-        </figure>
-      )}
 
       {model.schemes.length > 1 && (
         <div className="flex flex-wrap gap-1">

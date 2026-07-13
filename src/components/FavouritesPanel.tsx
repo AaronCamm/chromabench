@@ -150,26 +150,17 @@ function SchemeFavouriteCard({
 
   return (
     <div className="border border-border">
-      {resolved?.scheme.imageUrl ? (
-        <img
-          src={resolved.scheme.imageUrl}
-          alt=""
-          className="aspect-[16/10] w-full object-cover border-b border-border bg-surface"
-        />
-      ) : (
-        <div className="flex h-10 overflow-hidden border-b border-border">
-          {swatches.map((hex, i) => (
-            <span key={i} className="flex-1" style={{ backgroundColor: hex }} />
-          ))}
-        </div>
-      )}
+      <div className="flex h-10 overflow-hidden border-b border-border">
+        {swatches.map((hex, i) => (
+          <span key={i} className="flex-1" style={{ backgroundColor: hex }} />
+        ))}
+      </div>
       <div className="px-3 py-3 flex items-start gap-2">
         <Plane className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{title}</div>
           <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground truncate">
             {subtitle}
-            {resolved?.scheme.imageCredit ? ` · ${resolved.scheme.imageCredit}` : ""}
           </div>
         </div>
       </div>

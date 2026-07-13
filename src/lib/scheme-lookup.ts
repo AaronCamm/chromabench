@@ -2,8 +2,6 @@ import type { ModelCategory, SchemeColorCallout, SchemeSource } from "@/data/mod
 import { resolveCalloutPaint } from "@/lib/fs-paints";
 import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 import { verifyCitationUrl } from "@/lib/citation-verify";
-import { verifyReferenceImageUrl } from "@/lib/image-verify";
-import { findCommonsReferenceImages, type CommonsImageOption } from "@/lib/wikimedia-image";
 import {
   reviewSchemeDraftWithOpenAI,
   suggestCitationUrlWithOpenAI,
@@ -23,9 +21,6 @@ export type SchemeLookupDraft = {
   confidence: "high" | "medium" | "low" | "unknown";
   notes?: string;
   citedUrl?: string;
-  /** Direct Wikimedia upload URL when known. */
-  imageUrl?: string;
-  imageCredit?: string;
 };
 
 export type SchemeLookupResult = {
@@ -36,7 +31,6 @@ export type SchemeLookupResult = {
     url?: string;
   };
   review: SchemeReviewMeta;
-  imageOptions: CommonsImageOption[];
 };
 
 const LOOKUP_SYSTEM = `You are a scale modelling colour researcher for Chromabench.
@@ -55,9 +49,6 @@ Rules:
   (Cybermodeler, museum fact sheets, IPMS, warbird registry, etc.). Never invent or guess a URL path.
   The URL path/slug must name this aircraft (e.g. …/consolidated-b-24d-liberator/), not a
   different type on the same site. If you are not sure the exact URL is correct, omit citedUrl.
-- imageUrl: optional direct https Wikimedia upload URL (upload.wikimedia.org/…) of THIS aircraft/scheme.
-  Prefer well-known museum photos on Commons. Include imageCredit (e.g. "Photo: USAF / Wikimedia Commons").
-  Omit if you do not know a real direct file URL.
 - Respond with JSON only matching the schema.`;
 
 export async function lookupSchemeWithClaude(
@@ -126,15 +117,6 @@ export async function lookupSchemeWithClaude(
                 description:
                   "Exact public URL for this aircraft/scheme only if known; omit if unsure",
               },
-              imageUrl: {
-                type: "string",
-                description:
-                  "Direct https upload.wikimedia.org image URL for this aircraft only if known",
-              },
-              imageCredit: {
-                type: "string",
-                description: "Short attribution for the image, e.g. Photo: USAF / Wikimedia Commons",
-              },
             },
             required: ["modelName", "category", "schemeName", "colors", "confidence"],
           },
@@ -190,31 +172,6 @@ export async function lookupSchemeWithClaude(
     reviewed.citedUrl = undefined;
   }
 
-  // Reference images from Commons (up to 3); draft defaults to the first.
-  const imageOptions = await findCommonsReferenceImages(reviewed, query, 3);
-  if (reviewed.imageUrl) {
-    const verifiedAi = await verifyReferenceImageUrl(reviewed.imageUrl);
-    if (
-      verifiedAi.status === "verified" &&
-      verifiedAi.url &&
-      !imageOptions.some((o) => o.url === verifiedAi.url)
-    ) {
-      imageOptions.unshift({
-        url: verifiedAi.url,
-        credit: reviewed.imageCredit?.trim() || "Wikimedia Commons",
-      });
-      if (imageOptions.length > 3) imageOptions.length = 3;
-    }
-  }
-
-  if (imageOptions.length > 0) {
-    reviewed.imageUrl = imageOptions[0].url;
-    reviewed.imageCredit = imageOptions[0].credit;
-  } else {
-    reviewed.imageUrl = undefined;
-    reviewed.imageCredit = undefined;
-  }
-
   return {
     draft: reviewed,
     citation: {
@@ -223,7 +180,6 @@ export async function lookupSchemeWithClaude(
       url: citation.url ?? reviewed.citedUrl,
     },
     review,
-    imageOptions,
   };
 }
 
@@ -270,8 +226,6 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
     : [];
 
   const rawUrl = typeof input.citedUrl === "string" ? input.citedUrl.trim() : "";
-  const rawImage = typeof input.imageUrl === "string" ? input.imageUrl.trim() : "";
-  const rawCredit = typeof input.imageCredit === "string" ? input.imageCredit.trim() : "";
 
   return {
     modelName: String(input.modelName ?? "Unknown model").trim(),
@@ -286,8 +240,6 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
     confidence: conf,
     notes: typeof input.notes === "string" ? input.notes : undefined,
     citedUrl: rawUrl || undefined,
-    imageUrl: rawImage || undefined,
-    imageCredit: rawCredit || undefined,
   };
 }
 

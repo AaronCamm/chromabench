@@ -3,7 +3,6 @@ import { requireUserFromRequest, slugifyId } from "@/lib/api-auth";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import { draftSources, type SchemeLookupDraft } from "@/lib/scheme-lookup";
 import { verifyCitationUrl } from "@/lib/citation-verify";
-import { verifyReferenceImageUrl } from "@/lib/image-verify";
 import { hasPaidAccess, type Profile, type Subscription } from "@/lib/types";
 
 export const Route = createFileRoute("/api/models/confirm")({
@@ -63,17 +62,6 @@ export const Route = createFileRoute("/api/models/confirm")({
                 : undefined;
           }
 
-          if (draft.imageUrl) {
-            const image = await verifyReferenceImageUrl(draft.imageUrl);
-            if (image.status === "verified") {
-              draft.imageUrl = image.url;
-              if (!draft.imageCredit?.trim()) draft.imageCredit = "Wikimedia Commons";
-            } else {
-              draft.imageUrl = undefined;
-              draft.imageCredit = undefined;
-            }
-          }
-
           const sources = draftSources(draft);
           // Always ensure User Added is first
           if (!sources.some((s) => s.label === "User Added")) {
@@ -126,8 +114,6 @@ export const Route = createFileRoute("/api/models/confirm")({
             buno: draft.buno ?? null,
             colors: draft.colors,
             sources,
-            image_url: draft.imageUrl ?? null,
-            image_credit: draft.imageCredit ?? null,
             query_text: body.query?.trim() || null,
             created_by: user.id,
           });

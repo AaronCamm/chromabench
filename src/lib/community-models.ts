@@ -18,8 +18,6 @@ type CommunitySchemeRow = {
   buno: string | null;
   colors: SchemeColorCallout[] | null;
   sources: SchemeSource[] | null;
-  image_url: string | null;
-  image_credit: string | null;
 };
 
 /** Fetch public community models+schemes (authenticated read). */
@@ -32,9 +30,7 @@ export async function fetchCommunityModels(): Promise<ModelSubject[]> {
       supabase.from("community_models").select("id, name, category, aliases"),
       supabase
         .from("community_schemes")
-        .select(
-          "id, model_id, name, operator, unit, year, buno, colors, sources, image_url, image_credit",
-        ),
+        .select("id, model_id, name, operator, unit, year, buno, colors, sources"),
     ]);
 
   if (modelError || schemeError || !models) {
@@ -55,8 +51,6 @@ export async function fetchCommunityModels(): Promise<ModelSubject[]> {
       sources: Array.isArray(row.sources) && row.sources.length > 0
         ? row.sources
         : [{ label: "User Added" }],
-      imageUrl: row.image_url ?? undefined,
-      imageCredit: row.image_credit ?? undefined,
     };
     const list = byModel.get(row.model_id) ?? [];
     list.push(scheme);
