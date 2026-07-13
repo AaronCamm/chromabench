@@ -9,26 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
 import { Route as BenchRouteImport } from './routes/bench'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
+import { Route as ApiStripeSyncRouteImport } from './routes/api/stripe/sync'
 import { Route as ApiStripePortalRouteImport } from './routes/api/stripe/portal'
 import { Route as ApiStripeCheckoutRouteImport } from './routes/api/stripe/checkout'
-import { Route as ApiStripeSyncRouteImport } from './routes/api/stripe/sync'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BenchRoute = BenchRouteImport.update({
   id: '/bench',
   path: '/bench',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe/webhook',
   path: '/api/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStripeSyncRoute = ApiStripeSyncRouteImport.update({
+  id: '/api/stripe/sync',
+  path: '/api/stripe/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStripePortalRoute = ApiStripePortalRouteImport.update({
@@ -39,11 +44,6 @@ const ApiStripePortalRoute = ApiStripePortalRouteImport.update({
 const ApiStripeCheckoutRoute = ApiStripeCheckoutRouteImport.update({
   id: '/api/stripe/checkout',
   path: '/api/stripe/checkout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStripeSyncRoute = ApiStripeSyncRouteImport.update({
-  id: '/api/stripe/sync',
-  path: '/api/stripe/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -110,13 +110,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/bench': {
       id: '/bench'
       path: '/bench'
@@ -124,11 +117,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BenchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stripe/webhook': {
       id: '/api/stripe/webhook'
       path: '/api/stripe/webhook'
       fullPath: '/api/stripe/webhook'
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stripe/sync': {
+      id: '/api/stripe/sync'
+      path: '/api/stripe/sync'
+      fullPath: '/api/stripe/sync'
+      preLoaderRoute: typeof ApiStripeSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stripe/portal': {
@@ -143,13 +150,6 @@ declare module '@tanstack/react-router' {
       path: '/api/stripe/checkout'
       fullPath: '/api/stripe/checkout'
       preLoaderRoute: typeof ApiStripeCheckoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/stripe/sync': {
-      id: '/api/stripe/sync'
-      path: '/api/stripe/sync'
-      fullPath: '/api/stripe/sync'
-      preLoaderRoute: typeof ApiStripeSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

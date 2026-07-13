@@ -5,7 +5,7 @@ Chromabench uses **Supabase** (auth + Postgres) and **Stripe** ($5/month with a 
 ## 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run [`supabase/migrations/001_init.sql`](../supabase/migrations/001_init.sql).
+2. In the SQL editor, run [`supabase/migrations/001_init.sql`](../supabase/migrations/001_init.sql) and [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002_scheme_favourites.sql).
 3. Authentication → Providers → Email: enable Email. For local/dev you can disable “Confirm email”.
 4. Authentication → URL Configuration:
    - **Site URL:** `https://chromabench.com`
@@ -63,5 +63,19 @@ where email = 'dad@example.com';
 
 ## 5. Product rules
 
-- **Entire bench** (Equivalents, Mixer, Recipe finder, Favourites) — requires sign-in and access (`trialing`, `active`, or `complimentary`).
-- Favourites store mixer and finder recipes (paint IDs + parts + hex/ΔE metadata).
+- **Entire bench** (Equivalents, Mixer, Recipe finder, Models (Beta), Favourites) — requires sign-in and access (`trialing`, `active`, or `complimentary`).
+- Favourites store mixer/finder recipes (paint IDs + parts + hex/ΔE metadata) and vehicle schemes (model + scheme IDs).
+
+## 6. Model scheme catalog
+
+The **Models (Beta)** tab uses a static catalog at `src/data/models/catalog.ts`, generated from Cybermodeler color profiles.
+
+To refresh the catalog locally:
+
+```bash
+npm run import:schemes
+```
+
+Then commit the updated `catalog.ts`. The app does **not** scrape at runtime.
+
+Run [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002_scheme_favourites.sql) on existing projects to allow `scheme` favourites.

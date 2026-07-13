@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase";
-import { hasPaidAccess, type FavouriteRecipe, type Profile, type Subscription } from "@/lib/types";
+import { hasPaidAccess, type FavouriteRecipe, type FavouriteKind, type FavouritePayload, type Profile, type Subscription } from "@/lib/types";
 
 /* Context modules export hooks alongside the provider. */
 /* eslint-disable react-refresh/only-export-components */
@@ -30,9 +30,9 @@ type AuthContextValue = {
   startCheckout: () => Promise<void>;
   openBillingPortal: () => Promise<void>;
   saveFavourite: (input: {
-    kind: "mixer" | "finder";
+    kind: FavouriteKind;
     title?: string;
-    payload: FavouriteRecipe["payload"];
+    payload: FavouritePayload;
   }) => Promise<{ error: string | null }>;
   deleteFavourite: (id: string) => Promise<void>;
 };
@@ -178,9 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const saveFavourite = useCallback(
     async (input: {
-      kind: "mixer" | "finder";
+      kind: FavouriteKind;
       title?: string;
-      payload: FavouriteRecipe["payload"];
+      payload: FavouritePayload;
     }) => {
       if (!session?.user) return { error: "Sign in required" };
       if (!hasPaidAccess(profile, subscription)) {

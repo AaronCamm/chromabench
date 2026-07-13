@@ -21,20 +21,39 @@ export type Subscription = {
   updated_at: string;
 };
 
-export type FavouriteKind = "mixer" | "finder";
+export type FavouriteKind = "mixer" | "finder" | "scheme";
 
 export type FavouritePaintPart = {
   id: string;
   parts: number;
 };
 
-export type FavouritePayload = {
+export type RecipeFavouritePayload = {
   paints: FavouritePaintPart[];
   hex?: string;
   dE?: number;
   brand?: string;
   targetPaintId?: string;
 };
+
+export type SchemeFavouritePayload = {
+  modelId: string;
+  schemeId: string;
+};
+
+export type FavouritePayload = RecipeFavouritePayload | SchemeFavouritePayload;
+
+export function isRecipeFavourite(
+  fav: FavouriteRecipe,
+): fav is FavouriteRecipe & { kind: "mixer" | "finder"; payload: RecipeFavouritePayload } {
+  return fav.kind === "mixer" || fav.kind === "finder";
+}
+
+export function isSchemeFavourite(
+  fav: FavouriteRecipe,
+): fav is FavouriteRecipe & { kind: "scheme"; payload: SchemeFavouritePayload } {
+  return fav.kind === "scheme";
+}
 
 export type FavouriteRecipe = {
   id: string;

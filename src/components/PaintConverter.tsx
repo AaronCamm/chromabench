@@ -1,23 +1,48 @@
 import { useMemo, useState } from "react";
 import { PAINTS, BRANDS, type Paint } from "@/data/paints";
 import { contrastText, deltaE, hexToLab, mixHex } from "@/lib/color";
-import { Search, Plus, X, ArrowRight, Beaker, Target, Shuffle, Heart } from "lucide-react";
+import { Search, Plus, X, ArrowRight, Beaker, Target, Shuffle, Heart, Plane } from "lucide-react";
 import { FavouriteButton, FavouritesPanel } from "@/components/FavouritesPanel";
+import { ModelsPanel } from "@/components/ModelsPanel";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
-type Tab = "equivalents" | "mixer" | "recipe" | "favourites";
+type Tab = "equivalents" | "mixer" | "recipe" | "models" | "favourites";
 type MixEntry = { paint: Paint; parts: number };
 
 export function PaintConverter() {
   const [tab, setTab] = useState<Tab>("equivalents");
   const [mixerSeed, setMixerSeed] = useState<MixEntry[] | null>(null);
   const [mixerKey, setMixerKey] = useState(0);
+  const [equivSeed, setEquivSeed] = useState<Paint | null>(null);
+  const [equivKey, setEquivKey] = useState(0);
+  const [recipeSeed, setRecipeSeed] = useState<Paint | null>(null);
+  const [recipeKey, setRecipeKey] = useState(0);
+  const [modelsFocus, setModelsFocus] = useState<{ modelId: string; schemeId: string } | null>(
+    null,
+  );
 
   const loadMixer = (entries: MixEntry[]) => {
     setMixerSeed(entries);
     setMixerKey((k) => k + 1);
     setTab("mixer");
+  };
+
+  const openEquivalents = (paint: Paint) => {
+    setEquivSeed(paint);
+    setEquivKey((k) => k + 1);
+    setTab("equivalents");
+  };
+
+  const openRecipe = (paint: Paint) => {
+    setRecipeSeed(paint);
+    setRecipeKey((k) => k + 1);
+    setTab("recipe");
+  };
+
+  const openScheme = (modelId: string, schemeId: string) => {
+    setModelsFocus({ modelId, schemeId });
+    setTab("models");
   };
 
   return (
@@ -45,18 +70,43 @@ export function PaintConverter() {
           hint="03"
         />
         <TabBtn
+          active={tab === "models"}
+          onClick={() => {
+            setModelsFocus(null);
+            setTab("models");
+          }}
+          icon={<Plane className="h-3.5 w-3.5" />}
+          label="Models (Beta)"
+          hint="04"
+        />
+        <TabBtn
           active={tab === "favourites"}
           onClick={() => setTab("favourites")}
           icon={<Heart className="h-3.5 w-3.5" />}
           label="Favourites"
-          hint="04"
+          hint="05"
         />
       </div>
       <div className="border border-t-0 border-border bg-card">
-        {tab === "equivalents" && <EquivalentsPanel />}
+        {tab === "equivalents" && (
+          <EquivalentsPanel key={equivKey} initialSource={equivSeed ?? undefined} />
+        )}
         {tab === "mixer" && <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />}
-        {tab === "recipe" && <RecipePanel onLoadMixer={loadMixer} />}
-        {tab === "favourites" && <FavouritesPanel onLoadMixer={loadMixer} />}
+        {tab === "recipe" && (
+          <RecipePanel key={recipeKey} initialTarget={recipeSeed ?? undefined} onLoadMixer={loadMixer} />
+        )}
+        {tab === "models" && (
+          <ModelsPanel
+            key={modelsFocus ? `${modelsFocus.modelId}-${modelsFocus.schemeId}` : "browse"}
+            initialModelId={modelsFocus?.modelId}
+            initialSchemeId={modelsFocus?.schemeId}
+            onOpenEquivalents={openEquivalents}
+            onOpenRecipe={openRecipe}
+          />
+        )}
+        {tab === "favourites" && (
+          <FavouritesPanel onLoadMixer={loadMixer} onOpenScheme={openScheme} />
+        )}
       </div>
     </div>
   );
@@ -188,9 +238,11 @@ function PaintPicker({
 
 /* ─────────── Equivalents ─────────── */
 
-function EquivalentsPanel() {
+function EquivalentsPanel({ initialSource }: { initialSource?: Paint }) {
   const [source, setSource] = useState<Paint | null>(
-    PAINTS.find((p) => p.name === "Mephiston Red") ?? null,
+    initialSource ??
+      PAINTS.find((p) => p.name === "Mephiston Red") ??
+      null,
   );
 
   const grouped = useMemo(() => {
@@ -475,10 +527,18 @@ function AddPaintRow({ onAdd }: { onAdd: (p: Paint) => void }) {
 
 /* ─────────── Recipe finder ─────────── */
 
-function RecipePanel({ onLoadMixer }: { onLoadMixer: (entries: MixEntry[]) => void }) {
+function RecipePanel({
+  initialTarget,
+  onLoadMixer,
+}: {
+  initialTarget?: Paint;
+  onLoadMixer: (entries: MixEntry[]) => void;
+}) {
   const { saveFavourite, hasAccess, configured } = useAuth();
   const [target, setTarget] = useState<Paint | null>(
-    PAINTS.find((p) => p.name === "Mephiston Red") ?? null,
+    initialTarget ??
+      PAINTS.find((p) => p.name === "Mephiston Red") ??
+      null,
   );
   const [brand, setBrand] = useState<string>("Tamiya");
 
