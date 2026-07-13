@@ -4,6 +4,7 @@ import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 import { verifyCitationUrl } from "@/lib/citation-verify";
 import {
   reviewSchemeDraftWithOpenAI,
+  suggestCitationUrlWithOpenAI,
   type SchemeReviewMeta,
 } from "@/lib/scheme-review";
 
@@ -44,8 +45,8 @@ Rules:
 - If unsure about a brand code, omit it — do not guess.
 - If you are not confident, set confidence to "low" or "unknown" and return an empty colors array rather than inventing.
 - Do not invent BuNos. Omit fields you do not know.
-- citedUrl: only include a real public http(s) page about THIS specific aircraft/scheme
-  (Cybermodeler, museum, IPMS, warbird registry, etc.). Never invent or guess a URL path.
+- citedUrl: include a real public http(s) page about THIS specific aircraft/scheme when known
+  (Cybermodeler, museum fact sheets, IPMS, warbird registry, etc.). Never invent or guess a URL path.
   The URL path/slug must name this aircraft (e.g. …/consolidated-b-24d-liberator/), not a
   different type on the same site. If you are not sure the exact URL is correct, omit citedUrl.
 - Respond with JSON only matching the schema.`;
@@ -140,18 +141,43 @@ export async function lookupSchemeWithClaude(
   }
 
   const draft = normalizeDraft(tool.input);
-  const { draft: reviewed, review } = await reviewSchemeDraftWithOpenAI(draft, query, notes);
+  let { draft: reviewed, review } = await reviewSchemeDraftWithOpenAI(draft, query, notes);
 
-  const citation = await verifyCitationUrl(reviewed.citedUrl, reviewed, query);
-  // Only auto-attach fully verified URLs; needs_review is returned separately for the UI.
-  reviewed.citedUrl = citation.status === "verified" ? citation.url : undefined;
+  let citation = await verifyCitationUrl(reviewed.citedUrl, reviewed, query);
+
+  // If we still have no usable citation, ask OpenAI specifically for a URL, then re-verify.
+  if (citation.status === "rejected" || citation.status === "missing") {
+    const suggested = await suggestCitationUrlWithOpenAI(reviewed, query, notes);
+    if (suggested.url) {
+      reviewed = { ...reviewed, citedUrl: suggested.url };
+      citation = await verifyCitationUrl(suggested.url, reviewed, query);
+      if (citation.status === "verified" || citation.status === "needs_review") {
+        review = {
+          ...review,
+          applied: true,
+          citedUrlChanged: true,
+          summary: suggested.summary
+            ? `${review.summary ? `${review.summary} · ` : ""}${suggested.summary}`
+            : review.summary ?? "Added citation from cross-check",
+        };
+      }
+    }
+  }
+
+  // Keep path-valid citations on the draft for save. needs_review (bot-blocked sites) still
+  // shows in the UI so the user can open/remove, but Confirm includes the link by default.
+  if (citation.status === "verified" || citation.status === "needs_review") {
+    reviewed.citedUrl = citation.url;
+  } else {
+    reviewed.citedUrl = undefined;
+  }
 
   return {
     draft: reviewed,
     citation: {
       status: citation.status,
       reason: citation.reason,
-      url: citation.url,
+      url: citation.url ?? reviewed.citedUrl,
     },
     review,
   };

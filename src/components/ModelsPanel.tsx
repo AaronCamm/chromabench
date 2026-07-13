@@ -169,9 +169,8 @@ export function ModelsPanel({
         body.citation?.status ?? (body.draft.citedUrl ? "verified" : "missing"),
       );
       setCitationReason(body.citation?.reason ?? null);
-      setPendingCitationUrl(
-        body.citation?.status === "needs_review" ? (body.citation.url ?? null) : null,
-      );
+      // needs_review URLs are already on the draft (included by default); no separate pending gate
+      setPendingCitationUrl(null);
       setReviewSummary(
         body.review?.applied && body.review.summary ? body.review.summary : null,
       );
@@ -540,7 +539,9 @@ function EmptySearchRequest({
         {draft.citedUrl ? (
           <div className="border border-border p-3 space-y-2">
             <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Cited reference · verified
+              {citationStatus === "needs_review"
+                ? "Cited reference · please confirm"
+                : "Cited reference · verified"}
             </div>
             <a
               href={draft.citedUrl}
@@ -552,8 +553,10 @@ function EmptySearchRequest({
               <ExternalLink className="h-3 w-3 shrink-0" />
             </a>
             <p className="text-xs text-muted-foreground">
-              We checked this page loads and mentions this model/scheme. Open it to double-check,
-              or remove it before saving.
+              {citationStatus === "needs_review"
+                ? citationReason ??
+                  "Open the link to confirm it’s the right page. It will be saved unless you remove it."
+                : "We checked this page loads and mentions this model/scheme. Open it to double-check, or remove it before saving."}
             </p>
             <button
               type="button"
