@@ -52,10 +52,8 @@ export function resolveCalloutPaint(callout: {
   sms?: string;
   mrColor?: string;
 }): Paint | undefined {
-  if (callout.fs) {
-    const fromFs = bestPaintForFs(callout.fs);
-    if (fromFs) return fromFs;
-  }
+  // Prefer explicit catalog brand codes when present — FS indexes are incomplete and AI
+  // FS guesses often disagree with a correct XF/C callout.
   const codeMap: [string | undefined, string][] = [
     [callout.tamiya, "Tamiya"],
     [callout.vallejo, "Vallejo"],
@@ -64,19 +62,14 @@ export function resolveCalloutPaint(callout: {
   ];
   for (const [code, brand] of codeMap) {
     if (!code) continue;
-    const normalized = code.replace(/^XF-|^X-|^C/i, (m) => (m.startsWith("C") ? "C" : m));
+    const needle = code.replace(/\s/g, "").toLowerCase();
     const hit = PAINTS.find(
-      (p) =>
-        p.brand === brand &&
-        (p.code.toLowerCase() === code.toLowerCase() ||
-          p.code.toLowerCase() === normalized.toLowerCase() ||
-          p.code.replace(/\s/g, "").toLowerCase() === code.replace(/\s/g, "").toLowerCase()),
+      (p) => p.brand === brand && p.code.replace(/\s/g, "").toLowerCase() === needle,
     );
     if (hit) return hit;
-    if (callout.fs) {
-      const byBrand = bestPaintForFs(callout.fs, brand);
-      if (byBrand) return byBrand;
-    }
+  }
+  if (callout.fs) {
+    return bestPaintForFs(callout.fs);
   }
   return undefined;
 }

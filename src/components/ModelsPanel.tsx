@@ -10,6 +10,7 @@ import {
   totalSchemeCount,
 } from "@/data/models";
 import { resolveCalloutPaint, hexForFs, paintsForFs } from "@/lib/fs-paints";
+import { closestEquivalents } from "@/lib/equivalents";
 import type { Paint } from "@/data/paints";
 import { FavouriteButton } from "@/components/FavouritesPanel";
 import { AuthDialog } from "@/components/AuthDialog";
@@ -684,7 +685,13 @@ function SchemeDetail({
             {scheme.colors.map((callout, i) => {
               const paint = resolveCalloutPaint(callout);
               const hex = paint?.hex ?? (callout.fs ? hexForFs(callout.fs) : undefined) ?? "#888888";
-              const fsPaints = callout.fs ? paintsForFs(callout.fs).slice(0, 4) : [];
+              const suggested = paint
+                ? closestEquivalents(paint, 1).slice(0, 4)
+                : (callout.fs ? paintsForFs(callout.fs).slice(0, 4) : []).map((p) => ({
+                    paint: p,
+                    brand: p.brand,
+                    dE: 0,
+                  }));
               return (
                 <tr key={i} className="border-b border-border last:border-b-0">
                   <td className="px-3 py-3">
@@ -701,8 +708,13 @@ function SchemeDetail({
                   </td>
                   <td className="px-3 py-3 hidden md:table-cell">
                     <div className="flex flex-wrap gap-1">
-                      {fsPaints.length > 0
-                        ? fsPaints.map((p) => (
+                      {paint && (
+                        <span className="mono text-[9px] uppercase tracking-wider border border-border px-1.5 py-0.5 bg-surface">
+                          {paint.brand} {paint.code}
+                        </span>
+                      )}
+                      {suggested.length > 0
+                        ? suggested.map(({ paint: p }) => (
                             <span
                               key={p.id}
                               className="mono text-[9px] uppercase tracking-wider border border-border px-1.5 py-0.5"

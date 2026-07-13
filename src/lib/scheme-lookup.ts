@@ -1,4 +1,6 @@
 import type { ModelCategory, SchemeColorCallout, SchemeSource } from "@/data/models/types";
+import { resolveCalloutPaint } from "@/lib/fs-paints";
+import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 
 export type SchemeLookupDraft = {
   modelName: string;
@@ -23,6 +25,8 @@ Rules:
 - Prefer FS ##### codes when the scheme is US-related or commonly mapped to FS.
 - Include role labels (e.g. Upper surface, Underside, Tan, Dark Green).
 - Optional brand codes (tamiya XF-###, vallejo 71.###, mrColor C###) only when widely published.
+- Brand codes for the same role MUST be colour-equivalents of each other (e.g. XF-23 with C20, never C367).
+- If unsure about a brand code, omit it — do not guess.
 - If you are not confident, set confidence to "low" or "unknown" and return an empty colors array rather than inventing.
 - Do not invent BuNos. Omit fields you do not know.
 - Respond with JSON only matching the schema.`;
@@ -140,7 +144,7 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
       if (typeof row.vallejo === "string" && row.vallejo) out.vallejo = row.vallejo;
       if (typeof row.mrColor === "string" && row.mrColor) out.mrColor = row.mrColor;
       if (typeof row.notes === "string" && row.notes) out.notes = row.notes;
-      return out;
+      return sanitizeCalloutBrandCodes(out, resolveCalloutPaint);
     })
     .filter(Boolean) as SchemeColorCallout[];
 
