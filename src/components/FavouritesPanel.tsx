@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Heart, Trash2, Plane } from "lucide-react";
 import { paintById, type Paint } from "@/data/paints";
-import { schemeById } from "@/data/models";
+import { schemeById, type ModelSubject } from "@/data/models";
 import { resolveCalloutPaint, hexForFs } from "@/lib/fs-paints";
 import { contrastText } from "@/lib/color";
 import { isRecipeFavourite, isSchemeFavourite, type FavouriteRecipe } from "@/lib/types";
 import { useAuth } from "@/contexts/auth-context";
+import { fetchCommunityModels } from "@/lib/community-models";
 
 export function FavouritesPanel({
   onLoadMixer,
@@ -14,7 +15,22 @@ export function FavouritesPanel({
   onLoadMixer: (entries: { paint: Paint; parts: number }[]) => void;
   onOpenScheme: (modelId: string, schemeId: string) => void;
 }) {
-  const { favourites, deleteFavourite, hasAccess, configured } = useAuth();
+  const { favourites, deleteFavourite, hasAccess, configured, session } = useAuth();
+  const [community, setCommunity] = useState<ModelSubject[]>([]);
+
+  useEffect(() => {
+    if (!configured || !session?.user) {
+      setCommunity([]);
+      return;
+    }
+    let cancelled = false;
+    fetchCommunityModels().then((models) => {
+      if (!cancelled) setCommunity(models);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, session?.user]);
 
   const vehicleFavs = useMemo(
     () => favourites.filter(isSchemeFavourite),
@@ -63,6 +79,7 @@ export function FavouritesPanel({
               <SchemeFavouriteCard
                 key={fav.id}
                 fav={fav}
+                community={community}
                 onOpen={() =>
                   onOpenScheme(fav.payload.modelId, fav.payload.schemeId)
                 }
@@ -112,14 +129,16 @@ export function FavouritesPanel({
 
 function SchemeFavouriteCard({
   fav,
+  community,
   onOpen,
   onDelete,
 }: {
   fav: FavouriteRecipe & { kind: "scheme" };
+  community: ModelSubject[];
   onOpen: () => void;
   onDelete: () => void;
 }) {
-  const resolved = schemeById(fav.payload.modelId, fav.payload.schemeId);
+  const resolved = schemeById(fav.payload.modelId, fav.payload.schemeId, community);
   const title = fav.title ?? resolved?.scheme.name ?? "Saved vehicle";
   const subtitle = resolved?.model.name ?? fav.payload.modelId;
 

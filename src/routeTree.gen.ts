@@ -15,6 +15,8 @@ import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhoo
 import { Route as ApiStripeSyncRouteImport } from './routes/api/stripe/sync'
 import { Route as ApiStripePortalRouteImport } from './routes/api/stripe/portal'
 import { Route as ApiStripeCheckoutRouteImport } from './routes/api/stripe/checkout'
+import { Route as ApiModelsLookupRouteImport } from './routes/api/models/lookup'
+import { Route as ApiModelsConfirmRouteImport } from './routes/api/models/confirm'
 
 const BenchRoute = BenchRouteImport.update({
   id: '/bench',
@@ -46,10 +48,22 @@ const ApiStripeCheckoutRoute = ApiStripeCheckoutRouteImport.update({
   path: '/api/stripe/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModelsLookupRoute = ApiModelsLookupRouteImport.update({
+  id: '/api/models/lookup',
+  path: '/api/models/lookup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiModelsConfirmRoute = ApiModelsConfirmRouteImport.update({
+  id: '/api/models/confirm',
+  path: '/api/models/confirm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bench': typeof BenchRoute
+  '/api/models/confirm': typeof ApiModelsConfirmRoute
+  '/api/models/lookup': typeof ApiModelsLookupRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/portal': typeof ApiStripePortalRoute
   '/api/stripe/sync': typeof ApiStripeSyncRoute
@@ -58,6 +72,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bench': typeof BenchRoute
+  '/api/models/confirm': typeof ApiModelsConfirmRoute
+  '/api/models/lookup': typeof ApiModelsLookupRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/portal': typeof ApiStripePortalRoute
   '/api/stripe/sync': typeof ApiStripeSyncRoute
@@ -67,6 +83,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bench': typeof BenchRoute
+  '/api/models/confirm': typeof ApiModelsConfirmRoute
+  '/api/models/lookup': typeof ApiModelsLookupRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/portal': typeof ApiStripePortalRoute
   '/api/stripe/sync': typeof ApiStripeSyncRoute
@@ -77,6 +95,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/bench'
+    | '/api/models/confirm'
+    | '/api/models/lookup'
     | '/api/stripe/checkout'
     | '/api/stripe/portal'
     | '/api/stripe/sync'
@@ -85,6 +105,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/bench'
+    | '/api/models/confirm'
+    | '/api/models/lookup'
     | '/api/stripe/checkout'
     | '/api/stripe/portal'
     | '/api/stripe/sync'
@@ -93,6 +115,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/bench'
+    | '/api/models/confirm'
+    | '/api/models/lookup'
     | '/api/stripe/checkout'
     | '/api/stripe/portal'
     | '/api/stripe/sync'
@@ -102,6 +126,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BenchRoute: typeof BenchRoute
+  ApiModelsConfirmRoute: typeof ApiModelsConfirmRoute
+  ApiModelsLookupRoute: typeof ApiModelsLookupRoute
   ApiStripeCheckoutRoute: typeof ApiStripeCheckoutRoute
   ApiStripePortalRoute: typeof ApiStripePortalRoute
   ApiStripeSyncRoute: typeof ApiStripeSyncRoute
@@ -152,12 +178,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeCheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/models/lookup': {
+      id: '/api/models/lookup'
+      path: '/api/models/lookup'
+      fullPath: '/api/models/lookup'
+      preLoaderRoute: typeof ApiModelsLookupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/models/confirm': {
+      id: '/api/models/confirm'
+      path: '/api/models/confirm'
+      fullPath: '/api/models/confirm'
+      preLoaderRoute: typeof ApiModelsConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BenchRoute: BenchRoute,
+  ApiModelsConfirmRoute: ApiModelsConfirmRoute,
+  ApiModelsLookupRoute: ApiModelsLookupRoute,
   ApiStripeCheckoutRoute: ApiStripeCheckoutRoute,
   ApiStripePortalRoute: ApiStripePortalRoute,
   ApiStripeSyncRoute: ApiStripeSyncRoute,

@@ -5,7 +5,10 @@ Chromabench uses **Supabase** (auth + Postgres) and **Stripe** ($5/month with a 
 ## 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run [`supabase/migrations/001_init.sql`](../supabase/migrations/001_init.sql) and [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002_scheme_favourites.sql).
+2. In the SQL editor, run:
+   - [`supabase/migrations/001_init.sql`](../supabase/migrations/001_init.sql)
+   - [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002_scheme_favourites.sql)
+   - [`supabase/migrations/003_community_schemes.sql`](../supabase/migrations/003_community_schemes.sql)
 3. Authentication → Providers → Email: enable Email. For local/dev you can disable “Confirm email”.
 4. Authentication → URL Configuration:
    - **Site URL:** `https://chromabench.com`
@@ -36,12 +39,13 @@ Copy `.env.example` → `.env` (or Cloudflare `.dev.vars` for Workers). Restart 
 | ----------------------------- | ------------------------------------ |
 | `VITE_SUPABASE_URL`           | Browser + server                     |
 | `VITE_SUPABASE_ANON_KEY`      | Browser + server                     |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Server only (webhooks)               |
+| `SUPABASE_SERVICE_ROLE_KEY`   | Server only (webhooks / confirm API) |
 | `STRIPE_SECRET_KEY`           | Server only                          |
 | `STRIPE_WEBHOOK_SECRET`       | Server only                          |
 | `STRIPE_PRICE_ID_MONTHLY`     | Server only                          |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Reserved for future client Stripe.js |
 | `APP_URL`                     | Server (Checkout / Portal URLs)      |
+| `ANTHROPIC_API_KEY`           | Server only (Models scheme lookup)   |
 
 ## 4. Complimentary access (family)
 
@@ -79,3 +83,7 @@ npm run import:schemes
 Then commit the updated `catalog.ts`. The app does **not** scrape at runtime.
 
 Run [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002_scheme_favourites.sql) on existing projects to allow `scheme` favourites.
+
+When search finds nothing, signed-in subscribers can **Request this model**. Claude looks up FS callouts; after the user confirms, the scheme is stored in Supabase (`community_models` / `community_schemes`) with source **User Added** and appears in Models search for everyone signed in.
+
+Run [`supabase/migrations/003_community_schemes.sql`](../supabase/migrations/003_community_schemes.sql) and set `ANTHROPIC_API_KEY` on Vercel for that flow.

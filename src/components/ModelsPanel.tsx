@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ExternalLink, Heart, Plane, Search, Truck, ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ExternalLink, Plane, Search, Truck, ChevronLeft } from "lucide-react";
 import {
   searchModels,
   modelById,
@@ -12,7 +12,11 @@ import {
 import { resolveCalloutPaint, hexForFs, paintsForFs } from "@/lib/fs-paints";
 import type { Paint } from "@/data/paints";
 import { FavouriteButton } from "@/components/FavouritesPanel";
+import { AuthDialog } from "@/components/AuthDialog";
 import { useAuth } from "@/contexts/auth-context";
+import { fetchCommunityModels } from "@/lib/community-models";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import type { SchemeLookupDraft } from "@/lib/scheme-lookup";
 import { toast } from "sonner";
 
 type ModelsPanelProps = {
@@ -22,20 +26,48 @@ type ModelsPanelProps = {
   onOpenRecipe: (paint: Paint) => void;
 };
 
+type RequestStep = "idle" | "form" | "loading" | "preview";
+
 export function ModelsPanel({
   initialModelId,
   initialSchemeId,
   onOpenEquivalents,
   onOpenRecipe,
 }: ModelsPanelProps) {
+  const { session, hasAccess, configured } = useAuth();
+  const signedInUser = Boolean(session?.user);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ModelCategory | "all">("all");
+  const [community, setCommunity] = useState<ModelSubject[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(initialModelId ?? null);
   const [selectedSchemeId, setSelectedSchemeId] = useState<string | null>(initialSchemeId ?? null);
+  const [requestStep, setRequestStep] = useState<RequestStep>("idle");
+  const [requestQuery, setRequestQuery] = useState("");
+  const [requestNotes, setRequestNotes] = useState("");
+  const [draft, setDraft] = useState<SchemeLookupDraft | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [busyConfirm, setBusyConfirm] = useState(false);
 
-  const results = useMemo(() => searchModels(query, category), [query, category]);
+  useEffect(() => {
+    if (!configured || !signedInUser) {
+      setCommunity([]);
+      return;
+    }
+    let cancelled = false;
+    fetchCommunityModels().then((models) => {
+      if (!cancelled) setCommunity(models);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, signedInUser]);
+
+  const results = useMemo(
+    () => searchModels(query, category, community),
+    [query, category, community],
+  );
   const visibleResults = results.slice(0, 10);
-  const selectedModel = selectedModelId ? modelById(selectedModelId) : null;
+  const selectedModel = selectedModelId ? modelById(selectedModelId, community) : null;
   const selectedScheme =
     selectedModel && selectedSchemeId
       ? selectedModel.schemes.find((s) => s.id === selectedSchemeId)
@@ -44,10 +76,98 @@ export function ModelsPanel({
   const pickModel = (model: ModelSubject) => {
     setSelectedModelId(model.id);
     setSelectedSchemeId(model.schemes[0]?.id ?? null);
+    setRequestStep("idle");
   };
 
   const pickScheme = (scheme: PaintScheme) => {
     setSelectedSchemeId(scheme.id);
+  };
+
+  const startRequest = () => {
+    if (!signedInUser) {
+      setAuthOpen(true);
+      return;
+    }
+    if (!hasAccess) {
+      toast.error("Start a trial to request missing models");
+      return;
+    }
+    setRequestQuery(query.trim());
+    setRequestNotes("");
+    setDraft(null);
+    setRequestStep("form");
+  };
+
+  const runLookup = async () => {
+    const q = requestQuery.trim();
+    if (q.length < 2) {
+      toast.error("Enter a model or scheme name");
+      return;
+    }
+    setRequestStep("loading");
+    try {
+      const token =
+        session?.access_token ??
+        (await getSupabaseBrowserClient().auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error("Sign in required");
+      const res = await fetch("/api/models/lookup", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: q, notes: requestNotes.trim() || undefined }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        draft?: SchemeLookupDraft;
+        error?: string;
+      };
+      if (!res.ok || !body.draft) throw new Error(body.error ?? "Lookup failed");
+      setDraft(body.draft);
+      setRequestStep("preview");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lookup failed");
+      setRequestStep("form");
+    }
+  };
+
+  const confirmDraft = async () => {
+    if (!draft) return;
+    setBusyConfirm(true);
+    try {
+      const token =
+        session?.access_token ??
+        (await getSupabaseBrowserClient().auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error("Sign in required");
+      const res = await fetch("/api/models/confirm", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ draft, query: requestQuery.trim() }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        modelId?: string;
+        schemeId?: string;
+        error?: string;
+      };
+      if ((!res.ok && res.status !== 409) || !body.modelId || !body.schemeId) {
+        throw new Error(body.error ?? "Could not save scheme");
+      }
+      const refreshed = await fetchCommunityModels();
+      setCommunity(refreshed);
+      setSelectedModelId(body.modelId);
+      setSelectedSchemeId(body.schemeId);
+      setRequestStep("idle");
+      setDraft(null);
+      setQuery("");
+      toast.success(res.status === 409 ? "Scheme already exists — opened it" : "Scheme added");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Confirm failed");
+    } finally {
+      setBusyConfirm(false);
+    }
   };
 
   if (selectedModel && selectedScheme) {
@@ -110,7 +230,8 @@ export function ModelsPanel({
             Curated reference
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {totalSchemeCount()} schemes across aircraft and vehicles. Sources attributed per entry.
+            {totalSchemeCount(community)} schemes across aircraft and vehicles. Sources attributed
+            per entry.
           </p>
         </div>
       </div>
@@ -119,7 +240,10 @@ export function ModelsPanel({
         <Search className="h-4 w-4 ml-3 text-muted-foreground" />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (requestStep !== "idle") setRequestStep("idle");
+          }}
           placeholder="Search model, operator, unit, FS number…"
           className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
         />
@@ -148,7 +272,26 @@ export function ModelsPanel({
 
       <div className="grid gap-2">
         {results.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">No models match your search.</p>
+          <EmptySearchRequest
+            query={query}
+            step={requestStep}
+            requestQuery={requestQuery}
+            requestNotes={requestNotes}
+            draft={draft}
+            busyConfirm={busyConfirm}
+            signedIn={signedInUser}
+            hasAccess={hasAccess}
+            onStartRequest={startRequest}
+            onChangeRequestQuery={setRequestQuery}
+            onChangeRequestNotes={setRequestNotes}
+            onLookup={runLookup}
+            onConfirm={confirmDraft}
+            onCancel={() => {
+              setRequestStep("idle");
+              setDraft(null);
+            }}
+            onBackToForm={() => setRequestStep("form")}
+          />
         ) : (
           <>
             {visibleResults.map(({ model, matchedSchemes }) => (
@@ -192,6 +335,187 @@ export function ModelsPanel({
           </>
         )}
       </div>
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+    </div>
+  );
+}
+
+function EmptySearchRequest({
+  query,
+  step,
+  requestQuery,
+  requestNotes,
+  draft,
+  busyConfirm,
+  signedIn,
+  hasAccess,
+  onStartRequest,
+  onChangeRequestQuery,
+  onChangeRequestNotes,
+  onLookup,
+  onConfirm,
+  onCancel,
+  onBackToForm,
+}: {
+  query: string;
+  step: RequestStep;
+  requestQuery: string;
+  requestNotes: string;
+  draft: SchemeLookupDraft | null;
+  busyConfirm: boolean;
+  signedIn: boolean;
+  hasAccess: boolean;
+  onStartRequest: () => void;
+  onChangeRequestQuery: (v: string) => void;
+  onChangeRequestNotes: (v: string) => void;
+  onLookup: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  onBackToForm: () => void;
+}) {
+  if (step === "loading") {
+    return (
+      <div className="border border-border p-8 text-center space-y-2">
+        <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          Looking up colours…
+        </p>
+        <p className="text-sm text-muted-foreground">Researching FS callouts for your request.</p>
+      </div>
+    );
+  }
+
+  if (step === "preview" && draft) {
+    return (
+      <div className="border border-border p-5 space-y-4">
+        <div>
+          <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Preview · confidence {draft.confidence}
+          </div>
+          <h3 className="mt-1 text-lg font-semibold tracking-tight">{draft.modelName}</h3>
+          <p className="text-sm text-muted-foreground">{draft.schemeName}</p>
+          {draft.notes && <p className="mt-2 text-sm text-muted-foreground">{draft.notes}</p>}
+        </div>
+        {draft.colors.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No reliable colour callouts found. Try a more specific request (operator, year, or
+            scheme name).
+          </p>
+        ) : (
+          <ul className="divide-y divide-border border border-border">
+            {draft.colors.map((c, i) => {
+              const paint = resolveCalloutPaint(c);
+              const hex = paint?.hex ?? (c.fs ? hexForFs(c.fs) : undefined) ?? "#888";
+              return (
+                <li key={i} className="flex items-center gap-3 px-3 py-2">
+                  <span
+                    className="h-5 w-5 border border-border shrink-0"
+                    style={{ backgroundColor: hex }}
+                  />
+                  <span className="flex-1 text-sm">{c.role}</span>
+                  <span className="mono text-[10px] text-muted-foreground">
+                    {c.fs ? `FS ${c.fs}` : "—"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busyConfirm || draft.colors.length === 0}
+            onClick={onConfirm}
+            className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent disabled:opacity-50"
+          >
+            {busyConfirm ? "Saving…" : "Confirm & add"}
+          </button>
+          <button
+            type="button"
+            onClick={onBackToForm}
+            className="mono text-[11px] uppercase tracking-widest border border-border px-4 py-2.5 hover:bg-surface"
+          >
+            Try again
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="mono text-[11px] uppercase tracking-widest px-4 py-2.5 text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </div>
+        <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Source will be recorded as User Added
+        </p>
+      </div>
+    );
+  }
+
+  if (step === "form") {
+    return (
+      <div className="border border-border p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Request a scheme</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We&apos;ll look up FS colours for you to review before publishing.
+          </p>
+        </div>
+        <label className="block space-y-1.5">
+          <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Model / scheme
+          </span>
+          <input
+            value={requestQuery}
+            onChange={(e) => onChangeRequestQuery(e.target.value)}
+            className="w-full border border-border bg-background px-3 py-2.5 text-sm outline-none"
+            placeholder="e.g. TA-4J VF-127 Adversary"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Notes (optional)
+          </span>
+          <input
+            value={requestNotes}
+            onChange={(e) => onChangeRequestNotes(e.target.value)}
+            className="w-full border border-border bg-background px-3 py-2.5 text-sm outline-none"
+            placeholder="Operator, year, BuNo…"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onLookup}
+            className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent"
+          >
+            Look up colours
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="mono text-[11px] uppercase tracking-widest border border-border px-4 py-2.5 hover:bg-surface"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-dashed border-border p-8 text-center space-y-4">
+      <p className="text-sm text-muted-foreground">
+        {query.trim()
+          ? `No models match “${query.trim()}”.`
+          : "No models in this category."}
+      </p>
+      <button
+        type="button"
+        onClick={onStartRequest}
+        className="mono text-[11px] uppercase tracking-widest bg-foreground text-background px-4 py-2.5 hover:bg-accent"
+      >
+        {!signedIn ? "Sign in to request" : !hasAccess ? "Start trial to request" : "Request this model"}
+      </button>
     </div>
   );
 }

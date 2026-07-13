@@ -4,15 +4,48 @@ import { MODELS } from "./catalog";
 export type { ModelCategory, ModelSubject, PaintScheme, SchemeColorCallout, SchemeSource } from "./types";
 export { MODELS };
 
-export function modelById(id: string): ModelSubject | undefined {
-  return MODELS.find((m) => m.id === id);
+export function mergeModelCatalog(extra: ModelSubject[] = []): ModelSubject[] {
+  if (extra.length === 0) return MODELS;
+  const byId = new Map<string, ModelSubject>();
+
+  for (const model of MODELS) {
+    byId.set(model.id, { ...model, schemes: [...model.schemes] });
+  }
+
+  for (const model of extra) {
+    const existing = byId.get(model.id);
+    if (!existing) {
+      byId.set(model.id, { ...model, schemes: [...model.schemes] });
+      continue;
+    }
+    const schemeIds = new Set(existing.schemes.map((s) => s.id));
+    const mergedSchemes = [...existing.schemes];
+    for (const scheme of model.schemes) {
+      if (!schemeIds.has(scheme.id)) {
+        mergedSchemes.push(scheme);
+        schemeIds.add(scheme.id);
+      }
+    }
+    byId.set(model.id, {
+      ...existing,
+      aliases: Array.from(new Set([...existing.aliases, ...model.aliases])),
+      schemes: mergedSchemes,
+    });
+  }
+
+  return Array.from(byId.values());
+}
+
+export function modelById(id: string, extra: ModelSubject[] = []): ModelSubject | undefined {
+  return mergeModelCatalog(extra).find((m) => m.id === id);
 }
 
 export function schemeById(
   modelId: string,
   schemeId: string,
+  extra: ModelSubject[] = [],
 ): { model: ModelSubject; scheme: PaintScheme } | undefined {
-  const model = modelById(modelId);
+  const model = modelById(modelId, extra);
   if (!model) return undefined;
   const scheme = model.schemes.find((s) => s.id === schemeId);
   if (!scheme) return undefined;
@@ -41,11 +74,16 @@ function matchesTokens(haystack: string, tokens: string[]): number {
   return score;
 }
 
-export function searchModels(query: string, category?: ModelCategory | "all"): ModelSearchResult[] {
+export function searchModels(
+  query: string,
+  category?: ModelCategory | "all",
+  extraModels: ModelSubject[] = [],
+): ModelSearchResult[] {
   const tokens = tokenize(query.trim());
   const results: ModelSearchResult[] = [];
+  const catalog = mergeModelCatalog(extraModels);
 
-  for (const model of MODELS) {
+  for (const model of catalog) {
     if (category && category !== "all" && model.category !== category) continue;
 
     const baseHaystack = [model.name, model.era ?? "", ...model.aliases].join(" ");
@@ -80,6 +118,6 @@ export function searchModels(query: string, category?: ModelCategory | "all"): M
   return results.sort((a, b) => b.score - a.score || a.model.name.localeCompare(b.model.name));
 }
 
-export function totalSchemeCount(): number {
-  return MODELS.reduce((n, m) => n + m.schemes.length, 0);
+export function totalSchemeCount(extraModels: ModelSubject[] = []): number {
+  return mergeModelCatalog(extraModels).reduce((n, m) => n + m.schemes.length, 0);
 }
