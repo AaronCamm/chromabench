@@ -51,7 +51,7 @@ export async function lookupSchemeWithClaude(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: process.env.ANTHROPIC_MODEL?.trim() || "claude-sonnet-5",
       max_tokens: 2048,
       system: LOOKUP_SYSTEM,
       messages: [{ role: "user", content: userContent }],
