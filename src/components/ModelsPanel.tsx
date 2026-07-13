@@ -470,7 +470,7 @@ function EmptySearchRequest({
           Looking up colours…
         </p>
         <p className="text-sm text-muted-foreground">
-          Researching FS callouts and cross-checking the citation.
+          Researching FS callouts, citation, and a Commons reference photo.
         </p>
       </div>
     );

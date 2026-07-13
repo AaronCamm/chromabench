@@ -3,10 +3,10 @@ import { resolveCalloutPaint } from "@/lib/fs-paints";
 import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 import { verifyCitationUrl } from "@/lib/citation-verify";
 import { verifyReferenceImageUrl } from "@/lib/image-verify";
+import { findCommonsReferenceImage } from "@/lib/wikimedia-image";
 import {
   reviewSchemeDraftWithOpenAI,
   suggestCitationUrlWithOpenAI,
-  suggestReferenceImageWithOpenAI,
   type SchemeReviewMeta,
 } from "@/lib/scheme-review";
 
@@ -189,23 +189,20 @@ export async function lookupSchemeWithClaude(
     reviewed.citedUrl = undefined;
   }
 
-  // Reference image (Wikimedia direct uploads only)
+  // Reference image: verify AI URL, otherwise search Wikimedia Commons for a real file.
   let image = await verifyReferenceImageUrl(reviewed.imageUrl);
   if (image.status !== "verified") {
-    const suggestedImage = await suggestReferenceImageWithOpenAI(reviewed, query, notes);
-    if (suggestedImage.url) {
-      image = await verifyReferenceImageUrl(suggestedImage.url);
-      if (image.status === "verified") {
-        reviewed.imageCredit =
-          suggestedImage.credit?.trim() || reviewed.imageCredit || "Wikimedia Commons";
-        review = {
-          ...review,
-          applied: true,
-          summary: suggestedImage.summary
-            ? `${review.summary ? `${review.summary} · ` : ""}${suggestedImage.summary}`
-            : review.summary ?? "Added reference image from cross-check",
-        };
-      }
+    const commons = await findCommonsReferenceImage(reviewed, query);
+    if (commons.url) {
+      image = { url: commons.url, status: "verified" };
+      reviewed.imageCredit = commons.credit || reviewed.imageCredit || "Wikimedia Commons";
+      review = {
+        ...review,
+        applied: true,
+        summary: commons.summary
+          ? `${review.summary ? `${review.summary} · ` : ""}${commons.summary}`
+          : review.summary ?? "Added Wikimedia Commons reference image",
+      };
     }
   }
   if (image.status === "verified") {
