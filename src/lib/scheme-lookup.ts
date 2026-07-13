@@ -1,6 +1,7 @@
 import type { ModelCategory, SchemeColorCallout, SchemeSource } from "@/data/models/types";
 import { resolveCalloutPaint } from "@/lib/fs-paints";
 import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
+import { verifyCitationUrl } from "@/lib/citation-verify";
 
 export type SchemeLookupDraft = {
   modelName: string;
@@ -17,6 +18,15 @@ export type SchemeLookupDraft = {
   citedUrl?: string;
 };
 
+export type SchemeLookupResult = {
+  draft: SchemeLookupDraft;
+  citation: {
+    status: "verified" | "needs_review" | "rejected" | "missing";
+    reason?: string;
+    url?: string;
+  };
+};
+
 const LOOKUP_SYSTEM = `You are a scale modelling colour researcher for Chromabench.
 Given a model / operator / scheme request, return known Federal Standard (FS 595) or equivalent
 camouflage callouts used by hobbyists (decal sheets, Cybermodeler, IPMS charts).
@@ -29,12 +39,15 @@ Rules:
 - If unsure about a brand code, omit it — do not guess.
 - If you are not confident, set confidence to "low" or "unknown" and return an empty colors array rather than inventing.
 - Do not invent BuNos. Omit fields you do not know.
+- citedUrl: only include a real public http(s) page about THIS specific aircraft/scheme
+  (Cybermodeler, museum, IPMS, warbird registry, etc.). Never invent or guess a URL path.
+  If you are not sure the exact URL is correct, omit citedUrl.
 - Respond with JSON only matching the schema.`;
 
 export async function lookupSchemeWithClaude(
   query: string,
   notes?: string,
-): Promise<SchemeLookupDraft> {
+): Promise<SchemeLookupResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured");
@@ -92,7 +105,11 @@ export async function lookupSchemeWithClaude(
               },
               confidence: { type: "string", enum: ["high", "medium", "low", "unknown"] },
               notes: { type: "string" },
-              citedUrl: { type: "string" },
+              citedUrl: {
+                type: "string",
+                description:
+                  "Exact public URL for this aircraft/scheme only if known; omit if unsure",
+              },
             },
             required: ["modelName", "category", "schemeName", "colors", "confidence"],
           },
@@ -116,7 +133,19 @@ export async function lookupSchemeWithClaude(
     throw new Error("Claude did not return a scheme draft");
   }
 
-  return normalizeDraft(tool.input);
+  const draft = normalizeDraft(tool.input);
+  const citation = await verifyCitationUrl(draft.citedUrl, draft, query);
+  // Only auto-attach fully verified URLs; needs_review is returned separately for the UI.
+  draft.citedUrl = citation.status === "verified" ? citation.url : undefined;
+
+  return {
+    draft,
+    citation: {
+      status: citation.status,
+      reason: citation.reason,
+      url: citation.url,
+    },
+  };
 }
 
 function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
@@ -161,6 +190,8 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
     ? input.aliases.filter((a): a is string => typeof a === "string" && a.trim().length > 0)
     : [];
 
+  const rawUrl = typeof input.citedUrl === "string" ? input.citedUrl.trim() : "";
+
   return {
     modelName: String(input.modelName ?? "Unknown model").trim(),
     category: cat,
@@ -173,7 +204,7 @@ function normalizeDraft(input: Record<string, unknown>): SchemeLookupDraft {
     colors,
     confidence: conf,
     notes: typeof input.notes === "string" ? input.notes : undefined,
-    citedUrl: typeof input.citedUrl === "string" ? input.citedUrl : undefined,
+    citedUrl: rawUrl || undefined,
   };
 }
 

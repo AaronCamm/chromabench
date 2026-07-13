@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { requireUserFromRequest, slugifyId } from "@/lib/api-auth";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import { draftSources, type SchemeLookupDraft } from "@/lib/scheme-lookup";
+import { verifyCitationUrl } from "@/lib/citation-verify";
 import { hasPaidAccess, type Profile, type Subscription } from "@/lib/types";
 
 export const Route = createFileRoute("/api/models/confirm")({
@@ -50,6 +51,17 @@ export const Route = createFileRoute("/api/models/confirm")({
 
           const modelId = slugifyId(draft.modelName);
           const schemeId = slugifyId(`${modelId}-${draft.schemeName}`);
+
+          // Re-verify citation server-side so clients can't save unchecked URLs.
+          // needs_review is allowed when the user explicitly included the link after opening it.
+          if (draft.citedUrl) {
+            const citation = await verifyCitationUrl(draft.citedUrl, draft, body.query);
+            draft.citedUrl =
+              citation.status === "verified" || citation.status === "needs_review"
+                ? citation.url
+                : undefined;
+          }
+
           const sources = draftSources(draft);
           // Always ensure User Added is first
           if (!sources.some((s) => s.label === "User Added")) {

@@ -48,6 +48,11 @@ export function ModelsPanel({
   const [requestQuery, setRequestQuery] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
   const [draft, setDraft] = useState<SchemeLookupDraft | null>(null);
+  const [citationStatus, setCitationStatus] = useState<
+    "verified" | "needs_review" | "rejected" | "missing" | null
+  >(null);
+  const [citationReason, setCitationReason] = useState<string | null>(null);
+  const [pendingCitationUrl, setPendingCitationUrl] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [busyConfirm, setBusyConfirm] = useState(false);
 
@@ -115,6 +120,9 @@ export function ModelsPanel({
     setRequestQuery(query.trim());
     setRequestNotes("");
     setDraft(null);
+    setCitationStatus(null);
+    setCitationReason(null);
+    setPendingCitationUrl(null);
     setRequestStep("form");
   };
 
@@ -140,10 +148,22 @@ export function ModelsPanel({
       });
       const body = (await res.json().catch(() => ({}))) as {
         draft?: SchemeLookupDraft;
+        citation?: {
+          status?: "verified" | "needs_review" | "rejected" | "missing";
+          reason?: string;
+          url?: string;
+        };
         error?: string;
       };
       if (!res.ok || !body.draft) throw new Error(body.error ?? "Lookup failed");
       setDraft(body.draft);
+      setCitationStatus(
+        body.citation?.status ?? (body.draft.citedUrl ? "verified" : "missing"),
+      );
+      setCitationReason(body.citation?.reason ?? null);
+      setPendingCitationUrl(
+        body.citation?.status === "needs_review" ? (body.citation.url ?? null) : null,
+      );
       setRequestStep("preview");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lookup failed");
@@ -182,6 +202,9 @@ export function ModelsPanel({
       onFocusChange?.({ modelId: body.modelId, schemeId: body.schemeId });
       setRequestStep("idle");
       setDraft(null);
+      setCitationStatus(null);
+      setCitationReason(null);
+      setPendingCitationUrl(null);
       setQuery("");
       toast.success(res.status === 409 ? "Scheme already exists — opened it" : "Scheme added");
     } catch (err) {
@@ -336,6 +359,9 @@ export function ModelsPanel({
             requestQuery={requestQuery}
             requestNotes={requestNotes}
             draft={draft}
+            citationStatus={citationStatus}
+            citationReason={citationReason}
+            pendingCitationUrl={pendingCitationUrl}
             busyConfirm={busyConfirm}
             signedIn={signedInUser}
             hasAccess={hasAccess}
@@ -344,9 +370,24 @@ export function ModelsPanel({
             onChangeRequestNotes={setRequestNotes}
             onLookup={runLookup}
             onConfirm={confirmDraft}
+            onIncludePendingCitation={() => {
+              if (!pendingCitationUrl) return;
+              setDraft((d) => (d ? { ...d, citedUrl: pendingCitationUrl } : d));
+              setCitationStatus("verified");
+              setPendingCitationUrl(null);
+            }}
+            onClearCitation={() => {
+              setDraft((d) => (d ? { ...d, citedUrl: undefined } : d));
+              setCitationStatus("missing");
+              setCitationReason(null);
+              setPendingCitationUrl(null);
+            }}
             onCancel={() => {
               setRequestStep("idle");
               setDraft(null);
+              setCitationStatus(null);
+              setCitationReason(null);
+              setPendingCitationUrl(null);
             }}
             onBackToForm={() => setRequestStep("form")}
           />
@@ -364,6 +405,9 @@ function EmptySearchRequest({
   requestQuery,
   requestNotes,
   draft,
+  citationStatus,
+  citationReason,
+  pendingCitationUrl,
   busyConfirm,
   signedIn,
   hasAccess,
@@ -372,6 +416,8 @@ function EmptySearchRequest({
   onChangeRequestNotes,
   onLookup,
   onConfirm,
+  onIncludePendingCitation,
+  onClearCitation,
   onCancel,
   onBackToForm,
 }: {
@@ -381,6 +427,9 @@ function EmptySearchRequest({
   requestQuery: string;
   requestNotes: string;
   draft: SchemeLookupDraft | null;
+  citationStatus: "verified" | "needs_review" | "rejected" | "missing" | null;
+  citationReason: string | null;
+  pendingCitationUrl: string | null;
   busyConfirm: boolean;
   signedIn: boolean;
   hasAccess: boolean;
@@ -389,6 +438,8 @@ function EmptySearchRequest({
   onChangeRequestNotes: (v: string) => void;
   onLookup: () => void;
   onConfirm: () => void;
+  onIncludePendingCitation: () => void;
+  onClearCitation: () => void;
   onCancel: () => void;
   onBackToForm: () => void;
 }) {
@@ -463,9 +514,74 @@ function EmptySearchRequest({
             Cancel
           </button>
         </div>
-        <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Source will be recorded as User Added
-        </p>
+        {draft.citedUrl ? (
+          <div className="border border-border p-3 space-y-2">
+            <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Cited reference · verified
+            </div>
+            <a
+              href={draft.citedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm underline text-muted-foreground hover:text-foreground break-all"
+            >
+              {draft.citedUrl}
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+            <p className="text-xs text-muted-foreground">
+              We checked this page loads and mentions this model/scheme. Open it to double-check,
+              or remove it before saving.
+            </p>
+            <button
+              type="button"
+              onClick={onClearCitation}
+              className="mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+            >
+              Remove citation
+            </button>
+          </div>
+        ) : pendingCitationUrl ? (
+          <div className="border border-border p-3 space-y-2">
+            <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Cited reference · needs your confirmation
+            </div>
+            <a
+              href={pendingCitationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm underline text-muted-foreground hover:text-foreground break-all"
+            >
+              {pendingCitationUrl}
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+            <p className="text-xs text-muted-foreground">
+              {citationReason ??
+                "Open the link and confirm it’s the right page before including it."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onIncludePendingCitation}
+                className="mono text-[10px] uppercase tracking-widest border border-border px-3 py-1.5 hover:bg-surface"
+              >
+                Looks right — include
+              </button>
+              <button
+                type="button"
+                onClick={onClearCitation}
+                className="mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+              >
+                Skip citation
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            {citationStatus === "rejected"
+              ? `Source: User Added only${citationReason ? ` — ${citationReason.toLowerCase()}` : " — citation link could not be verified"}`
+              : "Source will be recorded as User Added"}
+          </p>
+        )}
       </div>
     );
   }

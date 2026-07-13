@@ -48,7 +48,9 @@ export async function fetchCommunityModels(): Promise<ModelSubject[]> {
       year: row.year ?? undefined,
       buno: row.buno ?? undefined,
       colors: Array.isArray(row.colors) ? row.colors : [],
-      sources: Array.isArray(row.sources) ? row.sources : [{ label: "User Added" }],
+      sources: Array.isArray(row.sources) && row.sources.length > 0
+        ? row.sources
+        : [{ label: "User Added" }],
     };
     const list = byModel.get(row.model_id) ?? [];
     list.push(scheme);

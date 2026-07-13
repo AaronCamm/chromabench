@@ -46,8 +46,12 @@ export const Route = createFileRoute("/api/models/lookup")({
 
           await admin.from("model_lookup_events").insert({ user_id: user.id });
 
-          const draft = await lookupSchemeWithClaude(query, body.notes);
-          return Response.json({ draft, query });
+          const result = await lookupSchemeWithClaude(query, body.notes);
+          return Response.json({
+            draft: result.draft,
+            query,
+            citation: result.citation,
+          });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Lookup failed";
           const status = message.includes("ANTHROPIC_API_KEY") ? 503 : 500;
