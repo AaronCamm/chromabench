@@ -34,6 +34,7 @@ export function ModelsPanel({
   const [selectedSchemeId, setSelectedSchemeId] = useState<string | null>(initialSchemeId ?? null);
 
   const results = useMemo(() => searchModels(query, category), [query, category]);
+  const visibleResults = results.slice(0, 10);
   const selectedModel = selectedModelId ? modelById(selectedModelId) : null;
   const selectedScheme =
     selectedModel && selectedSchemeId
@@ -149,39 +150,46 @@ export function ModelsPanel({
         {results.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No models match your search.</p>
         ) : (
-          results.map(({ model, matchedSchemes }) => (
-            <button
-              key={model.id}
-              type="button"
-              onClick={() => pickModel(model)}
-              className="flex items-start gap-3 border border-border p-4 text-left hover:bg-surface transition-colors w-full"
-            >
-              <span className="mt-0.5 text-muted-foreground">
-                {model.category === "vehicle" ? (
-                  <Truck className="h-4 w-4" />
-                ) : (
-                  <Plane className="h-4 w-4" />
-                )}
-              </span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-sm font-semibold tracking-tight">{model.name}</span>
-                <span className="mono block text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
-                  {matchedSchemes.length} scheme{matchedSchemes.length === 1 ? "" : "s"}
-                  {model.era ? ` · ${model.era}` : ""}
+          <>
+            {visibleResults.map(({ model, matchedSchemes }) => (
+              <button
+                key={model.id}
+                type="button"
+                onClick={() => pickModel(model)}
+                className="flex items-start gap-3 border border-border p-4 text-left hover:bg-surface transition-colors w-full"
+              >
+                <span className="mt-0.5 text-muted-foreground">
+                  {model.category === "vehicle" ? (
+                    <Truck className="h-4 w-4" />
+                  ) : (
+                    <Plane className="h-4 w-4" />
+                  )}
                 </span>
-                <span className="mt-2 flex flex-wrap gap-1">
-                  {matchedSchemes.slice(0, 4).map((s) => (
-                    <span
-                      key={s.id}
-                      className="mono text-[9px] uppercase tracking-wider border border-border px-1.5 py-0.5 text-muted-foreground"
-                    >
-                      {s.name.length > 28 ? `${s.name.slice(0, 28)}…` : s.name}
-                    </span>
-                  ))}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold tracking-tight">{model.name}</span>
+                  <span className="mono block text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+                    {matchedSchemes.length} scheme{matchedSchemes.length === 1 ? "" : "s"}
+                    {model.era ? ` · ${model.era}` : ""}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-1">
+                    {matchedSchemes.slice(0, 4).map((s) => (
+                      <span
+                        key={s.id}
+                        className="mono text-[9px] uppercase tracking-wider border border-border px-1.5 py-0.5 text-muted-foreground"
+                      >
+                        {s.name.length > 28 ? `${s.name.slice(0, 28)}…` : s.name}
+                      </span>
+                    ))}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))
+              </button>
+            ))}
+            {results.length > 10 && (
+              <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground text-center pt-2">
+                Showing 10 of {results.length} — refine your search to find more
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
