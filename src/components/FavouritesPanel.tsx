@@ -154,7 +154,7 @@ function SchemeFavouriteCard({
         <img
           src={resolved.scheme.imageUrl}
           alt=""
-          className="h-28 w-full object-cover border-b border-border bg-surface"
+          className="aspect-[16/10] w-full object-cover border-b border-border bg-surface"
         />
       ) : (
         <div className="flex h-10 overflow-hidden border-b border-border">

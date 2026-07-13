@@ -488,11 +488,26 @@ function EmptySearchRequest({
           {draft.notes && <p className="mt-2 text-sm text-muted-foreground">{draft.notes}</p>}
         </div>
         {imageOptions.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Reference photo{imageOptions.length > 1 ? " · choose one" : ""}
             </div>
-            <div className={`grid gap-2 ${imageOptions.length > 1 ? "grid-cols-3" : "grid-cols-1"}`}>
+            {draft.imageUrl && (
+              <img
+                src={draft.imageUrl}
+                alt={draft.schemeName}
+                className="w-full aspect-[16/10] max-h-80 object-cover border border-border bg-surface"
+              />
+            )}
+            <div
+              className={`grid gap-3 ${
+                imageOptions.length === 1
+                  ? "grid-cols-1"
+                  : imageOptions.length === 2
+                    ? "grid-cols-2"
+                    : "grid-cols-1 sm:grid-cols-3"
+              }`}
+            >
               {imageOptions.map((option) => {
                 const selected = draft.imageUrl === option.url;
                 return (
@@ -509,7 +524,7 @@ function EmptySearchRequest({
                     <img
                       src={option.url}
                       alt=""
-                      className="h-24 w-full object-cover bg-surface"
+                      className="aspect-[4/3] w-full object-cover bg-surface"
                     />
                   </button>
                 );
@@ -747,7 +762,7 @@ function SchemeListRow({ scheme, onClick }: { scheme: PaintScheme; onClick: () =
         <img
           src={scheme.imageUrl}
           alt=""
-          className="h-12 w-20 shrink-0 object-cover border border-border bg-surface"
+          className="h-16 w-24 shrink-0 object-cover border border-border bg-surface"
         />
       ) : (
         <div className="flex h-8 w-24 shrink-0 overflow-hidden border border-border">
@@ -845,7 +860,7 @@ function SchemeDetail({
           <img
             src={scheme.imageUrl}
             alt={`${model.name} — ${scheme.name}`}
-            className="w-full max-h-80 object-cover border border-border bg-surface"
+            className="w-full aspect-[16/10] max-h-[28rem] object-cover border border-border bg-surface"
           />
           {scheme.imageCredit && (
             <figcaption className="mono text-[10px] uppercase tracking-widest text-muted-foreground">

@@ -27,7 +27,7 @@ function stripHtml(value: string): string {
 }
 
 function searchQueries(draft: ImageSearchDraft, query?: string): string[] {
-  const parts = [
+  const base = [
     [draft.schemeName, draft.modelName].filter(Boolean).join(" "),
     draft.modelName,
     query?.trim(),
@@ -36,11 +36,28 @@ function searchQueries(draft: ImageSearchDraft, query?: string): string[] {
     .map((q) => q?.trim())
     .filter((q): q is string => Boolean(q && q.length >= 3));
 
-  return [...new Set(parts)].slice(0, 3);
+  // Prefer colour photos first, then general matches as fallback.
+  const withColor = base.flatMap((q) => [`${q} color`, `${q} colour`, q]);
+  return [...new Set(withColor)].slice(0, 6);
 }
 
-function relevanceScore(title: string, draft: ImageSearchDraft, query?: string): number {
-  const hay = title.toLowerCase();
+function isLikelyMono(text: string): boolean {
+  return /black[\s_-]?and[\s_-]?white|\bb\s*&\s*w\b|monochrome|gr[ae]yscale|sepia|noir/i.test(
+    text,
+  );
+}
+
+function isLikelyColor(text: string): boolean {
+  return /\bcolou?r(?:ed|ized)?\b|kodachrome|agfacolor|technicolor|full.?color/i.test(text);
+}
+
+function relevanceScore(
+  title: string,
+  categories: string,
+  draft: ImageSearchDraft,
+  query?: string,
+): number {
+  const hay = `${title} ${categories}`.toLowerCase();
   const tokens = [
     draft.modelName,
     draft.schemeName,
@@ -57,8 +74,17 @@ function relevanceScore(title: string, draft: ImageSearchDraft, query?: string):
   for (const t of [...new Set(tokens)]) {
     if (hay.includes(t)) score += t.length >= 6 ? 3 : 1;
   }
-  if (/nose.?art|aircraft|plane|bomber|fighter|tank|ship/i.test(title)) score += 1;
-  if (/map|diagram|drawing|logo|icon|flag/i.test(title)) score -= 2;
+  if (/nose.?art|aircraft|plane|bomber|fighter|tank|ship|museum/i.test(title)) score += 1;
+  if (/map|diagram|drawing|logo|icon|flag|silhouette|line.?art/i.test(title)) score -= 3;
+
+  // Strong preference for colour reference photos (paint schemes need colour).
+  if (isLikelyMono(hay)) score -= 8;
+  if (isLikelyColor(hay)) score += 5;
+  if (/black and white photographs|monochrome photographs/i.test(categories)) score -= 10;
+  if (/color photographs|colour photographs|photographs of .* in color/i.test(categories)) {
+    score += 4;
+  }
+
   return score;
 }
 
@@ -70,6 +96,7 @@ function creditFromMeta(meta: Record<string, { value?: string }> | undefined): s
 
 /**
  * Find up to `limit` real Wikimedia Commons files for this scheme.
+ * Prefers colour photos over black-and-white.
  */
 export async function findCommonsReferenceImages(
   draft: ImageSearchDraft,
@@ -79,11 +106,12 @@ export async function findCommonsReferenceImages(
   const queries = searchQueries(draft, query);
   if (queries.length === 0) return [];
 
-  const found: CommonsImageOption[] = [];
+  const colorHits: CommonsImageOption[] = [];
+  const monoHits: CommonsImageOption[] = [];
   const seen = new Set<string>();
 
   for (const q of queries) {
-    if (found.length >= limit) break;
+    if (colorHits.length >= limit) break;
 
     const params = new URLSearchParams({
       action: "query",
@@ -92,7 +120,7 @@ export async function findCommonsReferenceImages(
       generator: "search",
       gsrnamespace: "6",
       gsrsearch: q,
-      gsrlimit: "12",
+      gsrlimit: "16",
       prop: "imageinfo",
       iiprop: "url|mime|extmetadata",
       iiurlwidth: "1600",
@@ -120,28 +148,35 @@ export async function findCommonsReferenceImages(
           const url = info?.thumburl || info?.url;
           const mime = info?.mime ?? "";
           const title = page.title ?? "";
+          const categories = info?.extmetadata?.Categories?.value ?? "";
+          const blob = `${title} ${categories}`;
           return {
             page,
             url,
             mime,
             title,
-            score: relevanceScore(title, draft, query) - (page.index ?? 99) * 0.01,
+            categories,
+            mono: isLikelyMono(blob),
+            score: relevanceScore(title, categories, draft, query) - (page.index ?? 99) * 0.01,
           };
         })
         .filter((row) => row.url && row.mime.startsWith("image/"))
         .sort((a, b) => b.score - a.score);
 
       for (const row of ranked) {
-        if (found.length >= limit) break;
+        if (colorHits.length >= limit) break;
         if (!row.url || row.score < 2) continue;
         const verified = await verifyReferenceImageUrl(row.url);
         if (verified.status !== "verified" || !verified.url) continue;
         if (seen.has(verified.url)) continue;
         seen.add(verified.url);
-        found.push({
+
+        const option = {
           url: verified.url,
           credit: creditFromMeta(row.page.imageinfo?.[0]?.extmetadata),
-        });
+        };
+        if (row.mono) monoHits.push(option);
+        else colorHits.push(option);
       }
     } catch {
       /* try next query */
@@ -150,7 +185,8 @@ export async function findCommonsReferenceImages(
     }
   }
 
-  return found;
+  // Prefer colour; only pad with B&W if we couldn't find enough colour photos.
+  return [...colorHits, ...monoHits].slice(0, limit);
 }
 
 /** @deprecated use findCommonsReferenceImages */
