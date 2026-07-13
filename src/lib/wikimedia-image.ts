@@ -1,5 +1,10 @@
 import { verifyReferenceImageUrl } from "@/lib/image-verify";
 
+export type CommonsImageOption = {
+  url: string;
+  credit: string;
+};
+
 type ImageSearchDraft = {
   modelName: string;
   schemeName: string;
@@ -57,18 +62,29 @@ function relevanceScore(title: string, draft: ImageSearchDraft, query?: string):
   return score;
 }
 
+function creditFromMeta(meta: Record<string, { value?: string }> | undefined): string {
+  const artist = meta?.Artist?.value ? stripHtml(meta.Artist.value) : "";
+  const license = meta?.LicenseShortName?.value ? stripHtml(meta.LicenseShortName.value) : "";
+  return [artist || "Wikimedia Commons", license].filter(Boolean).join(" · ");
+}
+
 /**
- * Find a real Wikimedia Commons file for this scheme via the Commons API
- * (much more reliable than inventing upload.wikimedia.org paths).
+ * Find up to `limit` real Wikimedia Commons files for this scheme.
  */
-export async function findCommonsReferenceImage(
+export async function findCommonsReferenceImages(
   draft: ImageSearchDraft,
   query?: string,
-): Promise<{ url?: string; credit?: string; summary?: string }> {
+  limit = 3,
+): Promise<CommonsImageOption[]> {
   const queries = searchQueries(draft, query);
-  if (queries.length === 0) return {};
+  if (queries.length === 0) return [];
+
+  const found: CommonsImageOption[] = [];
+  const seen = new Set<string>();
 
   for (const q of queries) {
+    if (found.length >= limit) break;
+
     const params = new URLSearchParams({
       action: "query",
       format: "json",
@@ -76,7 +92,7 @@ export async function findCommonsReferenceImage(
       generator: "search",
       gsrnamespace: "6",
       gsrsearch: q,
-      gsrlimit: "8",
+      gsrlimit: "12",
       prop: "imageinfo",
       iiprop: "url|mime|extmetadata",
       iiurlwidth: "1600",
@@ -116,20 +132,16 @@ export async function findCommonsReferenceImage(
         .sort((a, b) => b.score - a.score);
 
       for (const row of ranked) {
+        if (found.length >= limit) break;
         if (!row.url || row.score < 2) continue;
         const verified = await verifyReferenceImageUrl(row.url);
         if (verified.status !== "verified" || !verified.url) continue;
-
-        const meta = row.page.imageinfo?.[0]?.extmetadata ?? {};
-        const artist = meta.Artist?.value ? stripHtml(meta.Artist.value) : "";
-        const license = meta.LicenseShortName?.value ? stripHtml(meta.LicenseShortName.value) : "";
-        const creditParts = [artist || "Wikimedia Commons", license].filter(Boolean);
-
-        return {
+        if (seen.has(verified.url)) continue;
+        seen.add(verified.url);
+        found.push({
           url: verified.url,
-          credit: creditParts.join(" · "),
-          summary: `Found Commons image for “${q}”`,
-        };
+          credit: creditFromMeta(row.page.imageinfo?.[0]?.extmetadata),
+        });
       }
     } catch {
       /* try next query */
@@ -138,5 +150,19 @@ export async function findCommonsReferenceImage(
     }
   }
 
-  return {};
+  return found;
+}
+
+/** @deprecated use findCommonsReferenceImages */
+export async function findCommonsReferenceImage(
+  draft: ImageSearchDraft,
+  query?: string,
+): Promise<{ url?: string; credit?: string; summary?: string }> {
+  const [first] = await findCommonsReferenceImages(draft, query, 1);
+  if (!first) return {};
+  return {
+    url: first.url,
+    credit: first.credit,
+    summary: "Found Commons reference image",
+  };
 }

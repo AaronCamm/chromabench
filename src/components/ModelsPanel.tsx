@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { fetchCommunityModels } from "@/lib/community-models";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { SchemeLookupDraft } from "@/lib/scheme-lookup";
+import type { CommonsImageOption } from "@/lib/wikimedia-image";
 import { toast } from "sonner";
 
 type ModelsPanelProps = {
@@ -53,7 +54,7 @@ export function ModelsPanel({
   >(null);
   const [citationReason, setCitationReason] = useState<string | null>(null);
   const [pendingCitationUrl, setPendingCitationUrl] = useState<string | null>(null);
-  const [reviewSummary, setReviewSummary] = useState<string | null>(null);
+  const [imageOptions, setImageOptions] = useState<CommonsImageOption[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
   const [busyConfirm, setBusyConfirm] = useState(false);
 
@@ -124,7 +125,7 @@ export function ModelsPanel({
     setCitationStatus(null);
     setCitationReason(null);
     setPendingCitationUrl(null);
-    setReviewSummary(null);
+    setImageOptions([]);
     setRequestStep("form");
   };
 
@@ -155,12 +156,7 @@ export function ModelsPanel({
           reason?: string;
           url?: string;
         };
-        review?: {
-          applied?: boolean;
-          summary?: string;
-          citedUrlChanged?: boolean;
-          colorsChanged?: boolean;
-        };
+        imageOptions?: CommonsImageOption[];
         error?: string;
       };
       if (!res.ok || !body.draft) throw new Error(body.error ?? "Lookup failed");
@@ -169,11 +165,8 @@ export function ModelsPanel({
         body.citation?.status ?? (body.draft.citedUrl ? "verified" : "missing"),
       );
       setCitationReason(body.citation?.reason ?? null);
-      // needs_review URLs are already on the draft (included by default); no separate pending gate
       setPendingCitationUrl(null);
-      setReviewSummary(
-        body.review?.applied && body.review.summary ? body.review.summary : null,
-      );
+      setImageOptions(Array.isArray(body.imageOptions) ? body.imageOptions.slice(0, 3) : []);
       setRequestStep("preview");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lookup failed");
@@ -215,7 +208,7 @@ export function ModelsPanel({
       setCitationStatus(null);
       setCitationReason(null);
       setPendingCitationUrl(null);
-      setReviewSummary(null);
+      setImageOptions([]);
       setQuery("");
       toast.success(res.status === 409 ? "Scheme already exists — opened it" : "Scheme added");
     } catch (err) {
@@ -373,7 +366,7 @@ export function ModelsPanel({
             citationStatus={citationStatus}
             citationReason={citationReason}
             pendingCitationUrl={pendingCitationUrl}
-            reviewSummary={reviewSummary}
+            imageOptions={imageOptions}
             busyConfirm={busyConfirm}
             signedIn={signedInUser}
             hasAccess={hasAccess}
@@ -394,6 +387,11 @@ export function ModelsPanel({
               setCitationReason(null);
               setPendingCitationUrl(null);
             }}
+            onSelectImage={(option) => {
+              setDraft((d) =>
+                d ? { ...d, imageUrl: option.url, imageCredit: option.credit } : d,
+              );
+            }}
             onClearImage={() => {
               setDraft((d) => (d ? { ...d, imageUrl: undefined, imageCredit: undefined } : d));
             }}
@@ -403,7 +401,7 @@ export function ModelsPanel({
               setCitationStatus(null);
               setCitationReason(null);
               setPendingCitationUrl(null);
-              setReviewSummary(null);
+              setImageOptions([]);
             }}
             onBackToForm={() => setRequestStep("form")}
           />
@@ -424,7 +422,7 @@ function EmptySearchRequest({
   citationStatus,
   citationReason,
   pendingCitationUrl,
-  reviewSummary,
+  imageOptions,
   busyConfirm,
   signedIn,
   hasAccess,
@@ -435,6 +433,7 @@ function EmptySearchRequest({
   onConfirm,
   onIncludePendingCitation,
   onClearCitation,
+  onSelectImage,
   onClearImage,
   onCancel,
   onBackToForm,
@@ -448,7 +447,7 @@ function EmptySearchRequest({
   citationStatus: "verified" | "needs_review" | "rejected" | "missing" | null;
   citationReason: string | null;
   pendingCitationUrl: string | null;
-  reviewSummary: string | null;
+  imageOptions: CommonsImageOption[];
   busyConfirm: boolean;
   signedIn: boolean;
   hasAccess: boolean;
@@ -459,6 +458,7 @@ function EmptySearchRequest({
   onConfirm: () => void;
   onIncludePendingCitation: () => void;
   onClearCitation: () => void;
+  onSelectImage: (option: CommonsImageOption) => void;
   onClearImage: () => void;
   onCancel: () => void;
   onBackToForm: () => void;
@@ -470,7 +470,7 @@ function EmptySearchRequest({
           Looking up colours…
         </p>
         <p className="text-sm text-muted-foreground">
-          Researching FS callouts, citation, and a Commons reference photo.
+          Researching FS callouts, citation, and Commons reference photos.
         </p>
       </div>
     );
@@ -486,32 +486,50 @@ function EmptySearchRequest({
           <h3 className="mt-1 text-lg font-semibold tracking-tight">{draft.modelName}</h3>
           <p className="text-sm text-muted-foreground">{draft.schemeName}</p>
           {draft.notes && <p className="mt-2 text-sm text-muted-foreground">{draft.notes}</p>}
-          {reviewSummary && (
-            <p className="mt-2 text-xs text-muted-foreground border border-border px-3 py-2">
-              Cross-check: {reviewSummary}
-            </p>
-          )}
         </div>
-        {draft.imageUrl && (
-          <figure className="space-y-2">
-            <img
-              src={draft.imageUrl}
-              alt={draft.schemeName}
-              className="w-full max-h-56 object-cover border border-border bg-surface"
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <figcaption className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                {draft.imageCredit ?? "Reference image"}
-              </figcaption>
-              <button
-                type="button"
-                onClick={onClearImage}
-                className="mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
-              >
-                Remove image
-              </button>
+        {imageOptions.length > 0 && (
+          <div className="space-y-2">
+            <div className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Reference photo{imageOptions.length > 1 ? " · choose one" : ""}
             </div>
-          </figure>
+            <div className={`grid gap-2 ${imageOptions.length > 1 ? "grid-cols-3" : "grid-cols-1"}`}>
+              {imageOptions.map((option) => {
+                const selected = draft.imageUrl === option.url;
+                return (
+                  <button
+                    key={option.url}
+                    type="button"
+                    onClick={() => onSelectImage(option)}
+                    className={`border text-left overflow-hidden transition-colors ${
+                      selected
+                        ? "border-foreground ring-1 ring-foreground"
+                        : "border-border hover:border-foreground/40"
+                    }`}
+                  >
+                    <img
+                      src={option.url}
+                      alt=""
+                      className="h-24 w-full object-cover bg-surface"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            {draft.imageUrl ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {draft.imageCredit ?? "Wikimedia Commons"}
+                </p>
+                <button
+                  type="button"
+                  onClick={onClearImage}
+                  className="mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                >
+                  No image
+                </button>
+              </div>
+            ) : null}
+          </div>
         )}
         {draft.colors.length === 0 ? (
           <p className="text-sm text-muted-foreground">

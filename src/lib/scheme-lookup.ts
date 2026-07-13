@@ -3,7 +3,7 @@ import { resolveCalloutPaint } from "@/lib/fs-paints";
 import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 import { verifyCitationUrl } from "@/lib/citation-verify";
 import { verifyReferenceImageUrl } from "@/lib/image-verify";
-import { findCommonsReferenceImage } from "@/lib/wikimedia-image";
+import { findCommonsReferenceImages, type CommonsImageOption } from "@/lib/wikimedia-image";
 import {
   reviewSchemeDraftWithOpenAI,
   suggestCitationUrlWithOpenAI,
@@ -36,6 +36,7 @@ export type SchemeLookupResult = {
     url?: string;
   };
   review: SchemeReviewMeta;
+  imageOptions: CommonsImageOption[];
 };
 
 const LOOKUP_SYSTEM = `You are a scale modelling colour researcher for Chromabench.
@@ -189,25 +190,26 @@ export async function lookupSchemeWithClaude(
     reviewed.citedUrl = undefined;
   }
 
-  // Reference image: verify AI URL, otherwise search Wikimedia Commons for a real file.
-  let image = await verifyReferenceImageUrl(reviewed.imageUrl);
-  if (image.status !== "verified") {
-    const commons = await findCommonsReferenceImage(reviewed, query);
-    if (commons.url) {
-      image = { url: commons.url, status: "verified" };
-      reviewed.imageCredit = commons.credit || reviewed.imageCredit || "Wikimedia Commons";
-      review = {
-        ...review,
-        applied: true,
-        summary: commons.summary
-          ? `${review.summary ? `${review.summary} · ` : ""}${commons.summary}`
-          : review.summary ?? "Added Wikimedia Commons reference image",
-      };
+  // Reference images from Commons (up to 3); draft defaults to the first.
+  const imageOptions = await findCommonsReferenceImages(reviewed, query, 3);
+  if (reviewed.imageUrl) {
+    const verifiedAi = await verifyReferenceImageUrl(reviewed.imageUrl);
+    if (
+      verifiedAi.status === "verified" &&
+      verifiedAi.url &&
+      !imageOptions.some((o) => o.url === verifiedAi.url)
+    ) {
+      imageOptions.unshift({
+        url: verifiedAi.url,
+        credit: reviewed.imageCredit?.trim() || "Wikimedia Commons",
+      });
+      if (imageOptions.length > 3) imageOptions.length = 3;
     }
   }
-  if (image.status === "verified") {
-    reviewed.imageUrl = image.url;
-    if (!reviewed.imageCredit?.trim()) reviewed.imageCredit = "Wikimedia Commons";
+
+  if (imageOptions.length > 0) {
+    reviewed.imageUrl = imageOptions[0].url;
+    reviewed.imageCredit = imageOptions[0].credit;
   } else {
     reviewed.imageUrl = undefined;
     reviewed.imageCredit = undefined;
@@ -221,6 +223,7 @@ export async function lookupSchemeWithClaude(
       url: citation.url ?? reviewed.citedUrl,
     },
     review,
+    imageOptions,
   };
 }
 
