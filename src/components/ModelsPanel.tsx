@@ -289,9 +289,48 @@ export function ModelsPanel({
       </div>
 
       <div className="grid gap-2">
-        {results.length === 0 ? (
+        {visibleResults.map(({ model, matchedSchemes }) => (
+          <button
+            key={model.id}
+            type="button"
+            onClick={() => pickModel(model)}
+            className="flex items-start gap-3 border border-border p-4 text-left hover:bg-surface transition-colors w-full"
+          >
+            <span className="mt-0.5 text-muted-foreground">
+              {model.category === "vehicle" ? (
+                <Truck className="h-4 w-4" />
+              ) : (
+                <Plane className="h-4 w-4" />
+              )}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold tracking-tight">{model.name}</span>
+              <span className="mono block text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+                {matchedSchemes.length} scheme{matchedSchemes.length === 1 ? "" : "s"}
+                {model.era ? ` · ${model.era}` : ""}
+              </span>
+              <span className="mt-2 flex flex-wrap gap-1">
+                {matchedSchemes.slice(0, 4).map((s) => (
+                  <span
+                    key={s.id}
+                    className="mono text-[9px] uppercase tracking-wider border border-border px-1.5 py-0.5 text-muted-foreground"
+                  >
+                    {s.name.length > 28 ? `${s.name.slice(0, 28)}…` : s.name}
+                  </span>
+                ))}
+              </span>
+            </span>
+          </button>
+        ))}
+        {results.length > 10 && (
+          <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground text-center pt-2">
+            Showing 10 of {results.length} — refine your search to find more
+          </p>
+        )}
+        {(results.length === 0 || query.trim() || requestStep !== "idle") && (
           <EmptySearchRequest
             query={query}
+            hasResults={results.length > 0}
             step={requestStep}
             requestQuery={requestQuery}
             requestNotes={requestNotes}
@@ -310,47 +349,6 @@ export function ModelsPanel({
             }}
             onBackToForm={() => setRequestStep("form")}
           />
-        ) : (
-          <>
-            {visibleResults.map(({ model, matchedSchemes }) => (
-              <button
-                key={model.id}
-                type="button"
-                onClick={() => pickModel(model)}
-                className="flex items-start gap-3 border border-border p-4 text-left hover:bg-surface transition-colors w-full"
-              >
-                <span className="mt-0.5 text-muted-foreground">
-                  {model.category === "vehicle" ? (
-                    <Truck className="h-4 w-4" />
-                  ) : (
-                    <Plane className="h-4 w-4" />
-                  )}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-semibold tracking-tight">{model.name}</span>
-                  <span className="mono block text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
-                    {matchedSchemes.length} scheme{matchedSchemes.length === 1 ? "" : "s"}
-                    {model.era ? ` · ${model.era}` : ""}
-                  </span>
-                  <span className="mt-2 flex flex-wrap gap-1">
-                    {matchedSchemes.slice(0, 4).map((s) => (
-                      <span
-                        key={s.id}
-                        className="mono text-[9px] uppercase tracking-wider border border-border px-1.5 py-0.5 text-muted-foreground"
-                      >
-                        {s.name.length > 28 ? `${s.name.slice(0, 28)}…` : s.name}
-                      </span>
-                    ))}
-                  </span>
-                </span>
-              </button>
-            ))}
-            {results.length > 10 && (
-              <p className="mono text-[10px] uppercase tracking-widest text-muted-foreground text-center pt-2">
-                Showing 10 of {results.length} — refine your search to find more
-              </p>
-            )}
-          </>
         )}
       </div>
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
@@ -360,6 +358,7 @@ export function ModelsPanel({
 
 function EmptySearchRequest({
   query,
+  hasResults,
   step,
   requestQuery,
   requestNotes,
@@ -376,6 +375,7 @@ function EmptySearchRequest({
   onBackToForm,
 }: {
   query: string;
+  hasResults: boolean;
   step: RequestStep;
   requestQuery: string;
   requestNotes: string;
@@ -521,11 +521,17 @@ function EmptySearchRequest({
   }
 
   return (
-    <div className="border border-dashed border-border p-8 text-center space-y-4">
+    <div
+      className={`border border-dashed border-border text-center space-y-4 ${
+        hasResults ? "p-5 mt-2" : "p-8"
+      }`}
+    >
       <p className="text-sm text-muted-foreground">
-        {query.trim()
-          ? `No models match “${query.trim()}”.`
-          : "No models in this category."}
+        {hasResults
+          ? "Not seeing the right scheme?"
+          : query.trim()
+            ? `No models match “${query.trim()}”.`
+            : "No models in this category."}
       </p>
       <button
         type="button"
