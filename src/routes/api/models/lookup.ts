@@ -51,6 +51,7 @@ export const Route = createFileRoute("/api/models/lookup")({
             draft: result.draft,
             query,
             citation: result.citation,
+            review: result.review,
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Lookup failed";

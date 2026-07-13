@@ -53,6 +53,7 @@ export function ModelsPanel({
   >(null);
   const [citationReason, setCitationReason] = useState<string | null>(null);
   const [pendingCitationUrl, setPendingCitationUrl] = useState<string | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [busyConfirm, setBusyConfirm] = useState(false);
 
@@ -123,6 +124,7 @@ export function ModelsPanel({
     setCitationStatus(null);
     setCitationReason(null);
     setPendingCitationUrl(null);
+    setReviewSummary(null);
     setRequestStep("form");
   };
 
@@ -153,6 +155,12 @@ export function ModelsPanel({
           reason?: string;
           url?: string;
         };
+        review?: {
+          applied?: boolean;
+          summary?: string;
+          citedUrlChanged?: boolean;
+          colorsChanged?: boolean;
+        };
         error?: string;
       };
       if (!res.ok || !body.draft) throw new Error(body.error ?? "Lookup failed");
@@ -163,6 +171,9 @@ export function ModelsPanel({
       setCitationReason(body.citation?.reason ?? null);
       setPendingCitationUrl(
         body.citation?.status === "needs_review" ? (body.citation.url ?? null) : null,
+      );
+      setReviewSummary(
+        body.review?.applied && body.review.summary ? body.review.summary : null,
       );
       setRequestStep("preview");
     } catch (err) {
@@ -205,6 +216,7 @@ export function ModelsPanel({
       setCitationStatus(null);
       setCitationReason(null);
       setPendingCitationUrl(null);
+      setReviewSummary(null);
       setQuery("");
       toast.success(res.status === 409 ? "Scheme already exists — opened it" : "Scheme added");
     } catch (err) {
@@ -362,6 +374,7 @@ export function ModelsPanel({
             citationStatus={citationStatus}
             citationReason={citationReason}
             pendingCitationUrl={pendingCitationUrl}
+            reviewSummary={reviewSummary}
             busyConfirm={busyConfirm}
             signedIn={signedInUser}
             hasAccess={hasAccess}
@@ -388,6 +401,7 @@ export function ModelsPanel({
               setCitationStatus(null);
               setCitationReason(null);
               setPendingCitationUrl(null);
+              setReviewSummary(null);
             }}
             onBackToForm={() => setRequestStep("form")}
           />
@@ -408,6 +422,7 @@ function EmptySearchRequest({
   citationStatus,
   citationReason,
   pendingCitationUrl,
+  reviewSummary,
   busyConfirm,
   signedIn,
   hasAccess,
@@ -430,6 +445,7 @@ function EmptySearchRequest({
   citationStatus: "verified" | "needs_review" | "rejected" | "missing" | null;
   citationReason: string | null;
   pendingCitationUrl: string | null;
+  reviewSummary: string | null;
   busyConfirm: boolean;
   signedIn: boolean;
   hasAccess: boolean;
@@ -449,7 +465,9 @@ function EmptySearchRequest({
         <p className="mono text-[11px] uppercase tracking-widest text-muted-foreground">
           Looking up colours…
         </p>
-        <p className="text-sm text-muted-foreground">Researching FS callouts for your request.</p>
+        <p className="text-sm text-muted-foreground">
+          Researching FS callouts and cross-checking the citation.
+        </p>
       </div>
     );
   }
@@ -464,6 +482,11 @@ function EmptySearchRequest({
           <h3 className="mt-1 text-lg font-semibold tracking-tight">{draft.modelName}</h3>
           <p className="text-sm text-muted-foreground">{draft.schemeName}</p>
           {draft.notes && <p className="mt-2 text-sm text-muted-foreground">{draft.notes}</p>}
+          {reviewSummary && (
+            <p className="mt-2 text-xs text-muted-foreground border border-border px-3 py-2">
+              Cross-check: {reviewSummary}
+            </p>
+          )}
         </div>
         {draft.colors.length === 0 ? (
           <p className="text-sm text-muted-foreground">

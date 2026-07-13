@@ -2,6 +2,10 @@ import type { ModelCategory, SchemeColorCallout, SchemeSource } from "@/data/mod
 import { resolveCalloutPaint } from "@/lib/fs-paints";
 import { sanitizeCalloutBrandCodes } from "@/lib/equivalents";
 import { verifyCitationUrl } from "@/lib/citation-verify";
+import {
+  reviewSchemeDraftWithOpenAI,
+  type SchemeReviewMeta,
+} from "@/lib/scheme-review";
 
 export type SchemeLookupDraft = {
   modelName: string;
@@ -25,6 +29,7 @@ export type SchemeLookupResult = {
     reason?: string;
     url?: string;
   };
+  review: SchemeReviewMeta;
 };
 
 const LOOKUP_SYSTEM = `You are a scale modelling colour researcher for Chromabench.
@@ -135,17 +140,20 @@ export async function lookupSchemeWithClaude(
   }
 
   const draft = normalizeDraft(tool.input);
-  const citation = await verifyCitationUrl(draft.citedUrl, draft, query);
+  const { draft: reviewed, review } = await reviewSchemeDraftWithOpenAI(draft, query, notes);
+
+  const citation = await verifyCitationUrl(reviewed.citedUrl, reviewed, query);
   // Only auto-attach fully verified URLs; needs_review is returned separately for the UI.
-  draft.citedUrl = citation.status === "verified" ? citation.url : undefined;
+  reviewed.citedUrl = citation.status === "verified" ? citation.url : undefined;
 
   return {
-    draft,
+    draft: reviewed,
     citation: {
       status: citation.status,
       reason: citation.reason,
       url: citation.url,
     },
+    review,
   };
 }
 

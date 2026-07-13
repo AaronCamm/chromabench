@@ -46,6 +46,7 @@ Copy `.env.example` → `.env` (or Cloudflare `.dev.vars` for Workers). Restart 
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Reserved for future client Stripe.js |
 | `APP_URL`                     | Server (Checkout / Portal URLs)      |
 | `ANTHROPIC_API_KEY`           | Server only (Models scheme lookup)   |
+| `OPENAI_API_KEY`              | Server only (optional scheme review) |
 
 ## 4. Complimentary access (family)
 
@@ -84,6 +85,6 @@ Then commit the updated `catalog.ts`. The app does **not** scrape at runtime.
 
 Run [`supabase/migrations/002_scheme_favourites.sql`](../supabase/migrations/002_scheme_favourites.sql) on existing projects to allow `scheme` favourites.
 
-When search finds nothing, signed-in subscribers can **Request this model**. Claude looks up FS callouts; after the user confirms, the scheme is stored in Supabase (`community_models` / `community_schemes`) with source **User Added** and appears in Models search for everyone signed in.
+When search finds nothing, signed-in subscribers can **Request this model**. Claude looks up FS callouts; an optional OpenAI second pass can correct wrong citation URLs (and colours) when certain. After the user confirms, the scheme is stored in Supabase (`community_models` / `community_schemes`) with source **User Added** and appears in Models search for everyone signed in.
 
-Run [`supabase/migrations/003_community_schemes.sql`](../supabase/migrations/003_community_schemes.sql) and set `ANTHROPIC_API_KEY` on Vercel for that flow.
+Run [`supabase/migrations/003_community_schemes.sql`](../supabase/migrations/003_community_schemes.sql) and set `ANTHROPIC_API_KEY` on Vercel for that flow. Optionally set `OPENAI_API_KEY` (and `OPENAI_MODEL`, default `gpt-4.1`) for the cross-check/correction pass.
