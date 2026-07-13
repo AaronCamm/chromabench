@@ -22,6 +22,7 @@ import { toast } from "sonner";
 type ModelsPanelProps = {
   initialModelId?: string | null;
   initialSchemeId?: string | null;
+  onFocusChange?: (focus: { modelId: string; schemeId: string | null } | null) => void;
   onOpenEquivalents: (paint: Paint) => void;
   onOpenRecipe: (paint: Paint) => void;
 };
@@ -31,6 +32,7 @@ type RequestStep = "idle" | "form" | "loading" | "preview";
 export function ModelsPanel({
   initialModelId,
   initialSchemeId,
+  onFocusChange,
   onOpenEquivalents,
   onOpenRecipe,
 }: ModelsPanelProps) {
@@ -47,6 +49,14 @@ export function ModelsPanel({
   const [draft, setDraft] = useState<SchemeLookupDraft | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [busyConfirm, setBusyConfirm] = useState(false);
+
+  // Deep-link from Favourites (or restore) while panel stays mounted across tabs
+  useEffect(() => {
+    if (!initialModelId) return;
+    setSelectedModelId(initialModelId);
+    setSelectedSchemeId(initialSchemeId ?? null);
+    setRequestStep("idle");
+  }, [initialModelId, initialSchemeId]);
 
   useEffect(() => {
     if (!configured || !signedInUser) {
@@ -74,13 +84,22 @@ export function ModelsPanel({
       : null;
 
   const pickModel = (model: ModelSubject) => {
+    const schemeId = model.schemes[0]?.id ?? null;
     setSelectedModelId(model.id);
-    setSelectedSchemeId(model.schemes[0]?.id ?? null);
+    setSelectedSchemeId(schemeId);
     setRequestStep("idle");
+    onFocusChange?.({ modelId: model.id, schemeId });
   };
 
   const pickScheme = (scheme: PaintScheme) => {
     setSelectedSchemeId(scheme.id);
+    if (selectedModelId) onFocusChange?.({ modelId: selectedModelId, schemeId: scheme.id });
+  };
+
+  const clearSelection = () => {
+    setSelectedModelId(null);
+    setSelectedSchemeId(null);
+    onFocusChange?.(null);
   };
 
   const startRequest = () => {
@@ -159,6 +178,7 @@ export function ModelsPanel({
       setCommunity(refreshed);
       setSelectedModelId(body.modelId);
       setSelectedSchemeId(body.schemeId);
+      onFocusChange?.({ modelId: body.modelId, schemeId: body.schemeId });
       setRequestStep("idle");
       setDraft(null);
       setQuery("");
@@ -177,11 +197,9 @@ export function ModelsPanel({
         scheme={selectedScheme}
         onBack={() => {
           setSelectedSchemeId(null);
+          if (selectedModelId) onFocusChange?.({ modelId: selectedModelId, schemeId: null });
         }}
-        onBackToList={() => {
-          setSelectedModelId(null);
-          setSelectedSchemeId(null);
-        }}
+        onBackToList={clearSelection}
         onPickScheme={pickScheme}
         onOpenEquivalents={onOpenEquivalents}
         onOpenRecipe={onOpenRecipe}
@@ -194,7 +212,7 @@ export function ModelsPanel({
       <div className="p-5 md:p-8 space-y-6">
         <button
           type="button"
-          onClick={() => setSelectedModelId(null)}
+          onClick={clearSelection}
           className="inline-flex items-center gap-2 mono text-[11px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" /> All models
@@ -564,7 +582,15 @@ function SchemeDetail({
   onOpenEquivalents: (paint: Paint) => void;
   onOpenRecipe: (paint: Paint) => void;
 }) {
-  const { saveFavourite, hasAccess, configured } = useAuth();
+  const { saveFavourite, hasAccess, configured, favourites } = useAuth();
+  const alreadySaved = favourites.some(
+    (f) =>
+      f.kind === "scheme" &&
+      f.payload &&
+      "modelId" in f.payload &&
+      f.payload.modelId === model.id &&
+      f.payload.schemeId === scheme.id,
+  );
 
   return (
     <div className="p-5 md:p-8 space-y-6">
@@ -600,6 +626,7 @@ function SchemeDetail({
         </div>
         <FavouriteButton
           disabled={!configured || !hasAccess}
+          alreadySaved={alreadySaved}
           onSave={async () => {
             const res = await saveFavourite({
               kind: "scheme",

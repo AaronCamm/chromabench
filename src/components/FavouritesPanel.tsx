@@ -256,30 +256,34 @@ function RecipeFavouriteCard({
 
 export function FavouriteButton({
   disabled,
+  alreadySaved,
   onSave,
 }: {
   disabled?: boolean;
+  alreadySaved?: boolean;
   onSave: () => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const saved = alreadySaved || justSaved;
 
   return (
     <button
       type="button"
-      disabled={disabled || busy}
+      disabled={disabled || busy || alreadySaved}
       onClick={async () => {
+        if (alreadySaved) return;
         setBusy(true);
         try {
           await onSave();
-          setSaved(true);
-          setTimeout(() => setSaved(false), 1500);
+          setJustSaved(true);
+          setTimeout(() => setJustSaved(false), 1500);
         } finally {
           setBusy(false);
         }
       }}
       className="inline-flex items-center gap-1.5 border border-border px-2.5 py-1.5 mono text-[10px] uppercase tracking-widest hover:bg-surface disabled:opacity-40"
-      title="Save favourite"
+      title={alreadySaved ? "Already in favourites" : "Save favourite"}
     >
       <Heart className={`h-3.5 w-3.5 ${saved ? "fill-foreground" : ""}`} />
       {saved ? "Saved" : busy ? "Saving…" : "Favourite"}

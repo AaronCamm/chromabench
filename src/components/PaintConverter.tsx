@@ -18,9 +18,10 @@ export function PaintConverter() {
   const [equivKey, setEquivKey] = useState(0);
   const [recipeSeed, setRecipeSeed] = useState<Paint | null>(null);
   const [recipeKey, setRecipeKey] = useState(0);
-  const [modelsFocus, setModelsFocus] = useState<{ modelId: string; schemeId: string } | null>(
-    null,
-  );
+  const [modelsFocus, setModelsFocus] = useState<{
+    modelId: string;
+    schemeId: string | null;
+  } | null>(null);
 
   const loadMixer = (entries: MixEntry[]) => {
     setMixerSeed(entries);
@@ -71,10 +72,7 @@ export function PaintConverter() {
         />
         <TabBtn
           active={tab === "models"}
-          onClick={() => {
-            setModelsFocus(null);
-            setTab("models");
-          }}
+          onClick={() => setTab("models")}
           icon={<Plane className="h-3.5 w-3.5" />}
           label="Models (Beta)"
           hint="04"
@@ -95,15 +93,15 @@ export function PaintConverter() {
         {tab === "recipe" && (
           <RecipePanel key={recipeKey} initialTarget={recipeSeed ?? undefined} onLoadMixer={loadMixer} />
         )}
-        {tab === "models" && (
+        <div className={tab === "models" ? undefined : "hidden"} aria-hidden={tab !== "models"}>
           <ModelsPanel
-            key={modelsFocus ? `${modelsFocus.modelId}-${modelsFocus.schemeId}` : "browse"}
             initialModelId={modelsFocus?.modelId}
             initialSchemeId={modelsFocus?.schemeId}
+            onFocusChange={setModelsFocus}
             onOpenEquivalents={openEquivalents}
             onOpenRecipe={openRecipe}
           />
-        )}
+        </div>
         {tab === "favourites" && (
           <FavouritesPanel onLoadMixer={loadMixer} onOpenScheme={openScheme} />
         )}
