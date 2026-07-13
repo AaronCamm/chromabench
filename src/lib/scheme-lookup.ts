@@ -41,7 +41,8 @@ Rules:
 - Do not invent BuNos. Omit fields you do not know.
 - citedUrl: only include a real public http(s) page about THIS specific aircraft/scheme
   (Cybermodeler, museum, IPMS, warbird registry, etc.). Never invent or guess a URL path.
-  If you are not sure the exact URL is correct, omit citedUrl.
+  The URL path/slug must name this aircraft (e.g. …/consolidated-b-24d-liberator/), not a
+  different type on the same site. If you are not sure the exact URL is correct, omit citedUrl.
 - Respond with JSON only matching the schema.`;
 
 export async function lookupSchemeWithClaude(
