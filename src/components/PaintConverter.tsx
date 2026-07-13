@@ -86,13 +86,18 @@ export function PaintConverter() {
         />
       </div>
       <div className="border border-t-0 border-border bg-card">
-        {tab === "equivalents" && (
+        <div
+          className={tab === "equivalents" ? undefined : "hidden"}
+          aria-hidden={tab !== "equivalents"}
+        >
           <EquivalentsPanel key={equivKey} initialSource={equivSeed ?? undefined} />
-        )}
-        {tab === "mixer" && <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />}
-        {tab === "recipe" && (
+        </div>
+        <div className={tab === "mixer" ? undefined : "hidden"} aria-hidden={tab !== "mixer"}>
+          <MixerPanel key={mixerKey} initialEntries={mixerSeed ?? undefined} />
+        </div>
+        <div className={tab === "recipe" ? undefined : "hidden"} aria-hidden={tab !== "recipe"}>
           <RecipePanel key={recipeKey} initialTarget={recipeSeed ?? undefined} onLoadMixer={loadMixer} />
-        )}
+        </div>
         <div className={tab === "models" ? undefined : "hidden"} aria-hidden={tab !== "models"}>
           <ModelsPanel
             initialModelId={modelsFocus?.modelId}
@@ -102,9 +107,12 @@ export function PaintConverter() {
             onOpenRecipe={openRecipe}
           />
         </div>
-        {tab === "favourites" && (
+        <div
+          className={tab === "favourites" ? undefined : "hidden"}
+          aria-hidden={tab !== "favourites"}
+        >
           <FavouritesPanel onLoadMixer={loadMixer} onOpenScheme={openScheme} />
-        )}
+        </div>
       </div>
     </div>
   );
